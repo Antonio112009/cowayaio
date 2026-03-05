@@ -217,7 +217,7 @@ Feature work should branch from `development`, and pull requests merge into `dev
 
 - PRs from `development` to `main` trigger the release workflow when merged
 - The workflow bumps `src/cowayaio/__version__.py`
-- PR labels control the version bump: `patch` (default), `minor`, or `major`
+- PRs to `main` must have exactly one version label: `patch`, `minor`, or `major`
 - A git tag and GitHub release are created automatically
 - The package is published to PyPI automatically
 

@@ -15,20 +15,25 @@ jobs:
     steps:
       - name: Only development can target main
         if: github.head_ref != 'development'
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          echo "::error::Only the 'development' branch can target 'main'. Got '${{ github.head_ref }}'."
+          echo "::error::Only the 'development' branch can target 'main'. Got '${HEAD_REF}'."
           exit 1
 
   version-label:
     runs-on: ubuntu-latest
     steps:
-      - name: Require version label
+      - name: Require exactly one version label
         env:
           LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
         run: |
-          if echo "$LABELS" | grep -qE '"(major|minor|patch)"'; then
-            echo "Version label found."
-          else
-            echo "::error::PR to main must have a version label: major, minor, or patch."
+          count=$(echo "$LABELS" | jq '[.[] | select(. == "major" or . == "minor" or . == "patch")] | length')
+
+          if [ "$count" -ne 1 ]; then
+            echo "::error::PR to main must have exactly one version label: major, minor, or patch."
             exit 1
           fi
+
+          label=$(echo "$LABELS" | jq -r '[.[] | select(. == "major" or . == "minor" or . == "patch")][0]')
+          echo "Version label found: $label"

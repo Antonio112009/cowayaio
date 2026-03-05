@@ -39,24 +39,46 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          pr_numbers=$(git log origin/main..origin/development --first-parent --format='%s' \
+            | sed -nE 's/^Merge pull request #([0-9]+).*/\1/p; s/.* \(#([0-9]+)\)$/\1/p' \
+            | awk '!seen[$0]++' \
+            | head -50)
+
+          pr_lines=""
+          if [ -n "$pr_numbers" ]; then
+            while IFS= read -r number; do
+              [ -n "$number" ] || continue
+
+              line=$(gh pr view "$number" --json number,title,author \
+                --jq '"- #\(.number) \(.title) (@\(.author.login))"' 2>/dev/null || true)
+
+              if [ -n "$line" ]; then
+                pr_lines="${pr_lines}${line}\n"
+              fi
+            done < <(printf '%s\n' "$pr_numbers")
+          fi
+
+          commit_lines=$(git log origin/main..origin/development --oneline --no-merges | head -50)
+
           {
             echo 'body<<CHANGELOG_EOF'
             echo '## Changes since last release'
             echo ''
 
-            # List merged PRs into development since main (exclude merge-loop artifacts)
             echo '### Merged pull requests'
-            gh pr list --base development --state merged \
-              --json number,title,mergedAt,author \
-              --jq '[sort_by(.mergedAt) | reverse | .[] |
-                select(.title | test("^Merge (pull request|development)") | not)] |
-                .[] | "- #\(.number) \(.title) (@\(.author.login))"' \
-            | head -50
+            if [ -n "$pr_lines" ]; then
+              printf '%b' "$pr_lines"
+            else
+              echo '- No pull requests detected from the unreleased commit range.'
+            fi
 
             echo ''
             echo '### Commits'
-            git log origin/main..origin/development --oneline --no-merges \
-            | head -50
+            if [ -n "$commit_lines" ]; then
+              printf '%s\n' "$commit_lines"
+            else
+              echo '- No non-merge commits since main.'
+            fi
 
             echo ''
             echo '---'
