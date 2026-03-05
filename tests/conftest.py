@@ -1,6 +1,13 @@
 """Shared test fixtures for cowayaio tests."""
 
+from pathlib import Path
+import sys
+
 import pytest
+
+
+# Keep direct test runs working with the src/ layout.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 
 @pytest.fixture

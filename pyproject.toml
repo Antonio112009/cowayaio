@@ -44,7 +44,11 @@ Upstream = "https://github.com/RobertD502/cowayaio"
 [tool.setuptools.dynamic]
 version = { attr = "cowayaio.__version__.__version__" }
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["cowayaio*"]
 
 [tool.setuptools.package-data]
