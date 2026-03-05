@@ -1,7 +1,6 @@
 """Data classes for Coway IoCare Purifiers."""
 
 from dataclasses import dataclass
-from typing import Any
 
 
 @dataclass
@@ -21,7 +20,7 @@ class DeviceAttributes:
 class PurifierData:
     """Dataclass for Purifier Data"""
 
-    purifiers: dict[str, CowayPurifier]
+    purifiers: dict[str, "CowayPurifier"]
 
 
 @dataclass

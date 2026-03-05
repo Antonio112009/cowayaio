@@ -1,8 +1,28 @@
 # cowayaio
 
-An asynchronous Python library for the Coway IoCare API, used to control Coway air purifiers (AIRMEGA series).
+[![CI](https://github.com/Antonio112009/cowayaio/actions/workflows/ci.yml/badge.svg)](https://github.com/Antonio112009/cowayaio/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.3.0-orange)](https://github.com/Antonio112009/cowayaio/releases)
+
+An asynchronous Python library for the [Coway IoCare](https://iocare.com/) API, used to control Coway air purifiers (AIRMEGA series).
 
 > **Fork notice:** This is a maintained fork of [RobertD502/cowayaio](https://github.com/RobertD502/cowayaio) with bug fixes, refactored architecture, typed models, tests, and CI.
+
+## Features
+
+- Async/await API built on [aiohttp](https://docs.aiohttp.org/)
+- Automatic token management and session handling
+- Typed dataclass models for purifier state
+- Full control: power, fan speed, modes, light, timer
+- Air quality readings: PM2.5, PM10, CO₂, AQI
+- Filter status monitoring
+- Async context manager for clean resource management
+
+## Requirements
+
+- Python 3.11+
+- A Coway IoCare account with registered purifier(s)
 
 ## Installation
 
@@ -16,12 +36,10 @@ pip install cowayaio
 import asyncio
 from cowayaio import CowayClient, LightMode
 
+
 async def main():
     async with CowayClient("email@example.com", "password") as client:
-        # Authenticate
         await client.login()
-
-        # Get all purifier data
         data = await client.async_get_purifiers_data()
 
         for device_id, purifier in data.purifiers.items():
@@ -30,6 +48,7 @@ async def main():
             print(f"  Fan Speed: {purifier.fan_speed}")
             print(f"  PM2.5: {purifier.particulate_matter_2_5}")
             print(f"  AQI: {purifier.air_quality_index}")
+
 
 asyncio.run(main())
 ```
@@ -52,8 +71,8 @@ async with CowayClient("email@example.com", "password") as client:
     # Modes
     await client.async_set_auto_mode(attr)
     await client.async_set_night_mode(attr)
-    await client.async_set_eco_mode(attr)      # AIRMEGA AP-1512HHS only
-    await client.async_set_rapid_mode(attr)     # AIRMEGA 250s only
+    await client.async_set_eco_mode(attr)       # AIRMEGA AP-1512HHS only
+    await client.async_set_rapid_mode(attr)      # AIRMEGA 250s only
 
     # Fan speed (1, 2, or 3)
     await client.async_set_fan_speed(attr, speed="2")
@@ -74,7 +93,7 @@ Each `CowayPurifier` provides:
 |---|---|---|
 | `device_attr` | `DeviceAttributes` | Device ID, model, name, place ID |
 | `is_on` | `bool \| None` | Power state |
-| `fan_speed` | `int \| None` | Fan speed (1-3) |
+| `fan_speed` | `int \| None` | Fan speed (1–3) |
 | `auto_mode` | `bool \| None` | Auto mode active |
 | `night_mode` | `bool \| None` | Night mode active |
 | `eco_mode` | `bool \| None` | Eco mode active |
@@ -89,16 +108,38 @@ Each `CowayPurifier` provides:
 
 ## Exceptions
 
+All exceptions inherit from `CowayError` and can be imported directly from the package:
+
+```python
+from cowayaio import CowayError, AuthError, PasswordExpired
+```
+
 | Exception | Description |
 |---|---|
-| `CowayError` | Base exception |
-| `AuthError` | Authentication failure |
+| `CowayError` | Base exception for all library errors |
+| `AuthError` | Authentication failure (invalid credentials) |
 | `PasswordExpired` | Password needs changing (60+ days old) |
-| `ServerMaintenance` | API under maintenance |
-| `RateLimited` | Account blocked (wait 24 hours) |
-| `NoPlaces` | No places configured in account |
-| `NoPurifiers` | No purifiers found |
+| `ServerMaintenance` | Coway API is under maintenance |
+| `RateLimited` | Account temporarily blocked (wait 24 hours) |
+| `NoPlaces` | No places configured in IoCare account |
+| `NoPurifiers` | No purifiers found in account |
+
+## Project Structure
+
+```
+src/cowayaio/
+├── client.py              # Public CowayClient entry point
+├── constants.py           # Enums: endpoints, parameters, headers
+├── exceptions.py          # Exception hierarchy
+├── account/               # Authentication & maintenance
+├── devices/               # Purifier control, data, models, parsing
+└── transport/             # HTTP session management
+```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow, branch strategy, and guidelines.
 
 ## License
 
-MIT
+[MIT](LICENSE) — originally by [RobertD502](https://github.com/RobertD502)

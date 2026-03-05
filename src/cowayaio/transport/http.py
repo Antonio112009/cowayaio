@@ -1,17 +1,17 @@
 """HTTP base client for Coway IoCare API."""
 
-from typing import Any
 import json
 import logging
+from typing import Any
 
 from aiohttp import ClientResponse, ClientSession, ClientTimeout, ContentTypeError
 
 from cowayaio.constants import (
+    TIMEOUT,
     Endpoint,
     ErrorMessages,
     Header,
     Parameter,
-    TIMEOUT,
 )
 from cowayaio.exceptions import (
     AuthError,
@@ -19,16 +19,13 @@ from cowayaio.exceptions import (
     ServerMaintenance,
 )
 
-
 LOGGER = logging.getLogger(__name__)
 
 
 class CowayHttpClient:
     """Low-level HTTP transport for Coway API."""
 
-    def __init__(
-        self, session: ClientSession | None = None, timeout: int = TIMEOUT
-    ) -> None:
+    def __init__(self, session: ClientSession | None = None, timeout: int = TIMEOUT) -> None:
         self._session: ClientSession = session if session else ClientSession()
         self._owns_session: bool = session is None
         self.timeout: ClientTimeout = ClientTimeout(total=timeout)
@@ -39,7 +36,7 @@ class CowayHttpClient:
         if self._owns_session and self._session and not self._session.closed:
             await self._session.close()
 
-    async def __aenter__(self) -> CowayHttpClient:
+    async def __aenter__(self) -> "CowayHttpClient":
         return self
 
     async def __aexit__(self, *args: Any) -> None:
@@ -48,11 +45,11 @@ class CowayHttpClient:
     async def _post_endpoint(self, data: dict[str, str]) -> dict[str, Any]:
         """POST to the token endpoint."""
 
-        url = f'{Endpoint.BASE_URI}{Endpoint.GET_TOKEN}'
+        url = f"{Endpoint.BASE_URI}{Endpoint.GET_TOKEN}"
         headers = {
-            'content-type': Header.CONTENT_JSON,
-            'user-agent': Header.COWAY_USER_AGENT,
-            'accept-language': Header.COWAY_LANGUAGE,
+            "content-type": Header.CONTENT_JSON,
+            "user-agent": Header.COWAY_USER_AGENT,
+            "accept-language": Header.COWAY_LANGUAGE,
         }
         async with self._session.post(
             url, headers=headers, data=json.dumps(data), timeout=self.timeout
@@ -76,12 +73,12 @@ class CowayHttpClient:
         """Build header for purifier control commands."""
 
         return {
-            'Content-Type': Header.CONTENT_JSON,
-            'Accept': '*/*',
-            'accept-language': Header.COWAY_LANGUAGE,
-            'User-Agent': Header.COWAY_USER_AGENT,
-            'authorization': f'Bearer {self.access_token}',
-            'region': 'NUS',
+            "Content-Type": Header.CONTENT_JSON,
+            "Accept": "*/*",
+            "accept-language": Header.COWAY_LANGUAGE,
+            "User-Agent": Header.COWAY_USER_AGENT,
+            "authorization": f"Bearer {self.access_token}",
+            "region": "NUS",
         }
 
     async def _get_purifier_html(
@@ -89,29 +86,29 @@ class CowayHttpClient:
     ) -> str:
         """Fetch the HTML page shown in the iOS app for an individual purifier."""
 
-        url = f'{Endpoint.PURIFIER_HTML_BASE}/{place_id}/product/{model_code}'
+        url = f"{Endpoint.PURIFIER_HTML_BASE}/{place_id}/product/{model_code}"
         headers = {
-            'theme': Header.THEME,
-            'callingpage': Header.CALLING_PAGE,
-            'accept': Header.ACCEPT,
-            'dvcnick': nick_name,
-            'timezoneid': Parameter.TIMEZONE,
-            'appversion': Parameter.APP_VERSION,
-            'accesstoken': self.access_token,
-            'accept-language': Header.COWAY_LANGUAGE,
-            'region': 'NUS',
-            'user-agent': Header.HTML_USER_AGENT,
-            'srcpath': Header.SOURCE_PATH,
-            'deviceserial': serial,
+            "theme": Header.THEME,
+            "callingpage": Header.CALLING_PAGE,
+            "accept": Header.ACCEPT,
+            "dvcnick": nick_name,
+            "timezoneid": Parameter.TIMEZONE,
+            "appversion": Parameter.APP_VERSION,
+            "accesstoken": self.access_token,
+            "accept-language": Header.COWAY_LANGUAGE,
+            "region": "NUS",
+            "user-agent": Header.HTML_USER_AGENT,
+            "srcpath": Header.SOURCE_PATH,
+            "deviceserial": serial,
         }
         params = {
-            'bottomSlide': 'false',
-            'tab': '0',
-            'temperatureUnit': 'F',
-            'weightUnit': 'oz',
-            'gravityUnit': 'lb',
+            "bottomSlide": "false",
+            "tab": "0",
+            "temperatureUnit": "F",
+            "weightUnit": "oz",
+            "gravityUnit": "lb",
         }
-        LOGGER.debug(f'Fetching purifier HTML page at {url}')
+        LOGGER.debug(f"Fetching purifier HTML page at {url}")
         async with self._session.get(
             url, headers=headers, params=params, timeout=self.timeout
         ) as resp:
@@ -126,42 +123,40 @@ class CowayHttpClient:
             try:
                 error_json = await resp.json()
             except (ValueError, ContentTypeError) as exc:
-                raise CowayError(f'Could not return json: {error}') from exc
+                raise CowayError(f"Could not return json: {error}") from exc
 
-            if 'error' in error_json:
-                return {'error': error_json}
+            if "error" in error_json:
+                return {"error": error_json}
 
-            message = error_json.get('message')
+            message = error_json.get("message")
             if message == ErrorMessages.BAD_TOKEN:
                 raise AuthError(
-                    f'Coway Auth error: Coway IoCare authentication failed; '
-                    f'{ErrorMessages.BAD_TOKEN}'
+                    f"Coway Auth error: Coway IoCare authentication failed; "
+                    f"{ErrorMessages.BAD_TOKEN}"
                 )
             if message == ErrorMessages.EXPIRED_TOKEN:
                 LOGGER.debug(
-                    f'Current access token has expired. Error: {ErrorMessages.EXPIRED_TOKEN}'
+                    f"Current access token has expired. Error: {ErrorMessages.EXPIRED_TOKEN}"
                 )
-                return {'error': ErrorMessages.EXPIRED_TOKEN}
-            return {'error': error_json}
+                return {"error": ErrorMessages.EXPIRED_TOKEN}
+            return {"error": error_json}
 
         try:
             response = await resp.json()
         except (ValueError, ContentTypeError) as exc:
-            raise CowayError(f'Could not return json {exc}') from exc
+            raise CowayError(f"Could not return json {exc}") from exc
 
-        if 'data' in response and 'maintainInfos' in response['data']:
-            raise ServerMaintenance('Coway Servers are undergoing maintenance.')
+        if "data" in response and "maintainInfos" in response["data"]:
+            raise ServerMaintenance("Coway Servers are undergoing maintenance.")
 
         # Sometimes an unauthorized message comes back with a 200 status.
-        if 'error' in response:
-            if response['error']['message'] == ErrorMessages.INVALID_REFRESH_TOKEN:
+        if "error" in response:
+            if response["error"]["message"] == ErrorMessages.INVALID_REFRESH_TOKEN:
                 raise AuthError(
-                    f'Coway Auth error: Coway IoCare authentication failed: '
-                    f'{ErrorMessages.INVALID_REFRESH_TOKEN}'
+                    f"Coway Auth error: Coway IoCare authentication failed: "
+                    f"{ErrorMessages.INVALID_REFRESH_TOKEN}"
                 )
-            raise CowayError(
-                f'Coway error message: {response["error"]["message"]}'
-            )
+            raise CowayError(f"Coway error message: {response['error']['message']}")
         return response
 
     @staticmethod
@@ -176,7 +171,7 @@ class CowayHttpClient:
         if resp.status != 200:
             return await resp.text()
 
-        if 'data' in response and 'maintainInfos' in response['data']:
-            raise ServerMaintenance('Coway Servers are undergoing maintenance.')
+        if "data" in response and "maintainInfos" in response["data"]:
+            raise ServerMaintenance("Coway Servers are undergoing maintenance.")
 
         return response
