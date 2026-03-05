@@ -7,6 +7,8 @@ on:
 jobs:
   create-pr:
     runs-on: ubuntu-latest
+    # Skip if the push is a merge commit from main (prevents loop)
+    if: ${{ !contains(github.event.head_commit.message, 'Merge pull request') || !contains(github.event.head_commit.message, 'from Antonio112009/main') }}
     permissions:
       contents: write
       pull-requests: write
@@ -15,7 +17,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check for meaningful diff
+        id: diff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Only create PR if development is actually ahead of main
+          if git diff origin/main...origin/development --quiet; then
+            echo "has_diff=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_diff=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create or update PR development → main
+        if: steps.diff.outputs.has_diff == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
