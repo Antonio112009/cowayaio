@@ -6,6 +6,15 @@ on:
     branches: [main]
 
 jobs:
+  source-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Only development can target main
+        if: github.head_ref != 'development'
+        run: |
+          echo "::error::Only the 'development' branch can target 'main'. Got '${{ github.head_ref }}'."
+          exit 1
+
   version-label:
     runs-on: ubuntu-latest
     steps:
