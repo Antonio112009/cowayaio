@@ -5,13 +5,20 @@ on:
     types: [closed]
     branches: [main]
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   bump-version:
-    if: github.event.pull_request.merged == true
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'development'
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,23 +30,58 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Determine bump type from PR labels
+      - name: Validate release label
         id: bump
         env:
           LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
         run: |
-          if echo "$LABELS" | grep -q '"major"'; then
-            echo "part=major" >> "$GITHUB_OUTPUT"
-          elif echo "$LABELS" | grep -q '"minor"'; then
-            echo "part=minor" >> "$GITHUB_OUTPUT"
-          else
-            echo "part=patch" >> "$GITHUB_OUTPUT"
+          count=$(echo "$LABELS" | jq '[.[] | select(. == "major" or . == "minor" or . == "patch")] | length')
+
+          if [ "$count" -ne 1 ]; then
+            echo "::error::Merged PRs to main must have exactly one version label: major, minor, or patch."
+            exit 1
           fi
 
-      - name: Bump version
+          part=$(echo "$LABELS" | jq -r '[.[] | select(. == "major" or . == "minor" or . == "patch")][0]')
+          echo "part=${part}" >> "$GITHUB_OUTPUT"
+
+      - name: Detect existing release bump
+        id: state
+        env:
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          head_message=$(git log -1 --format=%s main)
+          if printf '%s\n' "$head_message" | grep -qE '^Bump version to '; then
+            version=$(python3 -c "exec(open('src/pycoway/__version__.py').read()); print(__version__)")
+            echo "released=true" >> "$GITHUB_OUTPUT"
+            echo "version=${version}" >> "$GITHUB_OUTPUT"
+            echo "Main already points at release version ${version}."
+            exit 0
+          fi
+
+          first_descendant=$(git rev-list --ancestry-path --reverse "${MERGE_SHA}..main" | head -n 1)
+          if [ -n "$first_descendant" ]; then
+            first_message=$(git log -1 --format=%s "$first_descendant")
+            if printf '%s\n' "$first_message" | grep -qE '^Bump version to '; then
+              echo "released=true" >> "$GITHUB_OUTPUT"
+              echo "version=${first_message#Bump version to }" >> "$GITHUB_OUTPUT"
+              echo "Found existing release bump for this merge."
+              exit 0
+            fi
+          fi
+
+          echo "released=false" >> "$GITHUB_OUTPUT"
+
+      - name: Determine release version
         id: version
         run: |
-          FILE="src/cowayaio/__version__.py"
+          if [ "${{ steps.state.outputs.released }}" = "true" ]; then
+            echo "version=${{ steps.state.outputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "Reusing version ${{ steps.state.outputs.version }}"
+            exit 0
+          fi
+
+          FILE="src/pycoway/__version__.py"
           CURRENT=$(python3 -c "exec(open('$FILE').read()); print(__version__)")
           IFS='.' read -r major minor patch <<< "$CURRENT"
 
@@ -55,21 +97,54 @@ jobs:
           NEW="${major}.${minor}.${patch}"
           echo "__version__ = \"${NEW}\"" > "$FILE"
           echo "version=${NEW}" >> "$GITHUB_OUTPUT"
-          echo "Bumped $CURRENT → $NEW ($PART)"
+          echo "Bumped $CURRENT -> $NEW ($PART)"
 
       - name: Commit and tag
+        if: steps.state.outputs.released != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add src/cowayaio/__version__.py
+          git add src/pycoway/__version__.py
           git commit -m "Bump version to ${{ steps.version.outputs.version }}"
           git tag "v${{ steps.version.outputs.version }}"
-          git push origin main --tags
+          git push origin main "refs/tags/v${{ steps.version.outputs.version }}"
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          gh release create "v${{ steps.version.outputs.version }}" \
-            --title "v${{ steps.version.outputs.version }}" \
-            --generate-notes
+          if gh release view "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "GitHub release already exists for v${{ steps.version.outputs.version }}."
+          else
+            gh release create "v${{ steps.version.outputs.version }}" \
+              --title "v${{ steps.version.outputs.version }}" \
+              --generate-notes
+          fi
+
+  publish:
+    needs: bump-version
+    if: needs.bump-version.result == 'success'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pycoway
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.bump-version.outputs.version }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Build package
+        run: |
+          pip install build
+          python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true

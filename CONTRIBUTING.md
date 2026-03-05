@@ -1,4 +1,4 @@
-# Contributing to cowayaio
+# Contributing to pycoway
 
 Thank you for your interest in contributing! This document explains the workflow and guidelines.
 
@@ -28,9 +28,9 @@ Thank you for your interest in contributing! This document explains the workflow
 4. **When ready to release**, open a Pull Request from `development` → `main`. CI runs again.
 
 5. **On merge to `main`**, a release is created automatically:
-   - Version in `__version__.py` is bumped (patch by default)
+   - Version in `__version__.py` is bumped from the PR label
    - A git tag and GitHub release are created
-   - Add a `minor` or `major` label to the PR to control the bump type
+   - Add exactly one of `patch`, `minor`, or `major` to the PR before merging
 
 ## Development Setup
 
@@ -68,7 +68,7 @@ ruff format --check .
 ## Project Structure
 
 ```
-src/cowayaio/
+src/pycoway/
 ├── client.py              # Public CowayClient entry point
 ├── constants.py           # Enums for endpoints, parameters, headers
 ├── exceptions.py          # Exception hierarchy
