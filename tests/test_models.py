@@ -1,6 +1,6 @@
 """Tests for device models dataclasses."""
 
-from pycoway.devices.models import CowayPurifier, DeviceAttributes, PurifierData
+from pycoway.devices.models import CowayPurifier, DeviceAttributes, FilterInfo, PurifierData
 
 
 class TestDeviceAttributes:
@@ -72,6 +72,7 @@ class TestCowayPurifier:
             lux_sensor=300,
             pre_filter_change_frequency=112,
             smart_mode_sensitivity=3,
+            filters=None,
         )
         assert purifier.is_on is True
         assert purifier.fan_speed == 2
@@ -110,6 +111,7 @@ class TestPurifierData:
             lux_sensor=None,
             pre_filter_change_frequency=None,
             smart_mode_sensitivity=None,
+            filters=None,
         )
         data = PurifierData(purifiers={"D1": purifier})
         assert "D1" in data.purifiers

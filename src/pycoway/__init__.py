@@ -3,7 +3,7 @@
 from .__version__ import __version__
 from .client import CowayClient
 from .constants import LightMode
-from .devices.models import CowayPurifier, DeviceAttributes, PurifierData
+from .devices.models import CowayPurifier, DeviceAttributes, FilterInfo, PurifierData
 from .exceptions import (
     AuthError,
     CowayError,
