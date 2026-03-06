@@ -121,6 +121,24 @@ jobs:
               --generate-notes
           fi
 
+  sync-development:
+    needs: bump-version
+    if: needs.bump-version.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: development
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Merge main into development
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git merge origin/main --no-edit
+          git push origin development
+
   publish:
     needs: bump-version
     if: needs.bump-version.result == 'success'
