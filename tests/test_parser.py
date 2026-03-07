@@ -157,7 +157,6 @@ class TestBuildPurifier:
         sample_parsed_info["status_info"]["0002"] = 6
         p = build_purifier(sample_device, sample_parsed_info)
         assert p.eco_mode is True
-        assert p.auto_eco_mode is True
 
     def test_no_aq_grade(self, sample_device, sample_parsed_info):
         sample_parsed_info["aq_grade"] = None
@@ -172,18 +171,17 @@ class TestBuildPurifier:
     def test_iot_discovery_fields_populated(self):
         """When device dict comes from IoT API user-devices, extended attrs are populated."""
         iot_attr = DeviceAttributes(
-            device_id="15902EUZ2282500520",
+            device_id="FAKE0TEST0000000001",
             model=None,
-            model_code="AP-2015E(GRAPHITE_US)",
+            model_code="AP-1234X(TEST_MODEL)",
             code="02EUZ",
-            name="HH AIR PURIFIER",
+            name="Test Purifier",
             product_name="AIRMEGA",
             place_id=None,
             dvc_brand_cd="MG",
             dvc_type_cd="004",
-            prod_name="AIRMEGA",
-            prod_name_full="AIRMEGA 300s/400s",
-            order_no="ORD1WBGmBa7P",
+            prod_name_full="AIRMEGA Test",
+            order_no="ORD0TEST0001",
             sell_type_cd="1",
             admdong_cd="GB",
             station_cd="GB",
@@ -203,14 +201,14 @@ class TestBuildPurifier:
         purifier = build_purifier(iot_attr, empty_parsed)
         attr = purifier.device_attr
 
-        assert attr.device_id == "15902EUZ2282500520"
-        assert attr.model_code == "AP-2015E(GRAPHITE_US)"
+        assert attr.device_id == "FAKE0TEST0000000001"
+        assert attr.model_code == "AP-1234X(TEST_MODEL)"
         assert attr.code == "02EUZ"
-        assert attr.prod_name == "AIRMEGA"
+        assert attr.product_name == "AIRMEGA"
         assert attr.dvc_brand_cd == "MG"
         assert attr.dvc_type_cd == "004"
-        assert attr.prod_name_full == "AIRMEGA 300s/400s"
-        assert attr.order_no == "ORD1WBGmBa7P"
+        assert attr.prod_name_full == "AIRMEGA Test"
+        assert attr.order_no == "ORD0TEST0001"
         assert attr.sell_type_cd == "1"
         assert attr.admdong_cd == "GB"
         assert attr.station_cd == "GB"

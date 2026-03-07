@@ -15,18 +15,17 @@ from pycoway.exceptions import CowayError
 def iot_device_attr() -> DeviceAttributes:
     """DeviceAttributes populated with IoT API discovery fields."""
     return DeviceAttributes(
-        device_id="15902EUZ2282500520",
-        model="AIRMEGA 300s/400s",
-        model_code="AP-2015E(GRAPHITE_US)",
+        device_id="FAKE0TEST0000000001",
+        model="AIRMEGA Test",
+        model_code="AP-1234X(TEST_MODEL)",
         code="02EUZ",
-        name="HH AIR PURIFIER",
+        name="Test Purifier",
         product_name="AIRMEGA",
         place_id=None,
         dvc_brand_cd="MG",
         dvc_type_cd="004",
-        prod_name="AIRMEGA",
-        prod_name_full="AIRMEGA 300s/400s",
-        order_no="ORD1WBGmBa7P",
+        prod_name_full="AIRMEGA Test",
+        order_no="ORD0TEST0001",
         sell_type_cd="1",
         admdong_cd="GB",
         station_cd="GB",
@@ -54,15 +53,15 @@ class TestBuildDeviceAttr:
 
     def test_from_iot_device_dict(self):
         dev = {
-            "barcode": "15902EUZ2282500520",
-            "dvcModel": "AP-2015E(GRAPHITE_US)",
-            "dvcNick": "HH AIR PURIFIER",
+            "barcode": "FAKE0TEST0000000001",
+            "dvcModel": "AP-1234X(TEST_MODEL)",
+            "dvcNick": "Test Purifier",
             "prodType": "02EUZ",
             "prodName": "AIRMEGA",
-            "prodNameFull": "AIRMEGA 300s/400s",
+            "prodNameFull": "AIRMEGA Test",
             "dvcBrandCd": "MG",
             "dvcTypeCd": "004",
-            "ordNo": "ORD1WBGmBa7P",
+            "ordNo": "ORD0TEST0001",
             "sellTypeCd": "1",
             "admdongCd": "GB",
             "stationCd": "GB",
@@ -70,8 +69,8 @@ class TestBuildDeviceAttr:
             "comType": "WIFI",
         }
         attr = CowayDataClient._build_device_attr(dev)
-        assert attr.device_id == "15902EUZ2282500520"
-        assert attr.model_code == "AP-2015E(GRAPHITE_US)"
+        assert attr.device_id == "FAKE0TEST0000000001"
+        assert attr.model_code == "AP-1234X(TEST_MODEL)"
         assert attr.dvc_brand_cd == "MG"
         assert attr.dvc_type_cd == "004"
         assert attr.mqtt_device is True
@@ -85,14 +84,14 @@ class TestBuildDeviceAttr:
 class TestIOTDeviceParams:
     def test_builds_expected_params(self, iot_device_attr):
         params = CowayDataClient._iot_device_params(iot_device_attr)
-        assert params["devId"] == "15902EUZ2282500520"
-        assert params["barcode"] == "15902EUZ2282500520"
+        assert params["devId"] == "FAKE0TEST0000000001"
+        assert params["barcode"] == "FAKE0TEST0000000001"
         assert params["mqttDevice"] == "true"
         assert params["dvcBrandCd"] == "MG"
         assert params["dvcTypeCd"] == "004"
         assert params["deviceType"] == "004"
         assert params["prodName"] == "AIRMEGA"
-        assert params["orderNo"] == "ORD1WBGmBa7P"
+        assert params["orderNo"] == "ORD0TEST0001"
         assert params["membershipYn"] == "N"
         assert params["selfYn"] == "N"
         assert params["sellTypeCd"] == "1"
@@ -142,7 +141,7 @@ class TestAsyncGetIOTDeviceControl:
         call_args = client._get_iot_endpoint.call_args
         url = call_args[0][0]
         assert url == (
-            f"{Endpoint.IOT_BASE_URI}{Endpoint.IOT_DEVICE_CONTROL}/15902EUZ2282500520/control"
+            f"{Endpoint.IOT_BASE_URI}{Endpoint.IOT_DEVICE_CONTROL}/FAKE0TEST0000000001/control"
         )
 
     async def test_raises_on_error(self, iot_device_attr):
@@ -165,33 +164,12 @@ class TestAsyncGetIOTAirHome:
         client = _mock_iot_client({"data": {}})
         await client.async_get_iot_air_home(iot_device_attr)
         url = client._get_iot_endpoint.call_args[0][0]
-        assert url == (f"{Endpoint.IOT_BASE_URI}{Endpoint.IOT_AIR_HOME}/15902EUZ2282500520/home")
+        assert url == (f"{Endpoint.IOT_BASE_URI}{Endpoint.IOT_AIR_HOME}/FAKE0TEST0000000001/home")
 
     async def test_raises_on_error(self, iot_device_attr):
         client = _mock_iot_client({"error": "server error"})
         with pytest.raises(CowayError, match="IoT air home failed"):
             await client.async_get_iot_air_home(iot_device_attr)
-
-
-class TestAsyncGetIOTFilterInfo:
-    async def test_returns_data(self, iot_device_attr):
-        payload = {"suppliesList": [{"supplyNm": "MAX2 Filter", "filterRemain": 72}]}
-        client = _mock_iot_client({"data": payload})
-        result = await client.async_get_iot_filter_info(iot_device_attr)
-        assert result == payload
-
-    async def test_correct_url(self, iot_device_attr):
-        client = _mock_iot_client({"data": {}})
-        await client.async_get_iot_filter_info(iot_device_attr)
-        url = client._get_iot_endpoint.call_args[0][0]
-        assert url == (
-            f"{Endpoint.IOT_BASE_URI}{Endpoint.IOT_AIR_HOME}/15902EUZ2282500520/filter-info"
-        )
-
-    async def test_raises_on_error(self, iot_device_attr):
-        client = _mock_iot_client({"error": "not found"})
-        with pytest.raises(CowayError, match="IoT filter info failed"):
-            await client.async_get_iot_filter_info(iot_device_attr)
 
 
 class TestAsyncGetIOTDeviceConn:

@@ -185,7 +185,6 @@ def build_purifier(
         network_status=network_status,
         is_on=status.get("0001") == 1,
         auto_mode=mode_value == 1,
-        auto_eco_mode=mode_value == 6,
         eco_mode=mode_value == 6,
         night_mode=mode_value == 2,
         rapid_mode=mode_value == 5,

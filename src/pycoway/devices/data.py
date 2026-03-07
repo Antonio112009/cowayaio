@@ -240,7 +240,6 @@ class CowayDataClient(CowayMaintenanceClient):
             place_id=dev.get("placeId"),
             dvc_brand_cd=dev.get("dvcBrandCd"),
             dvc_type_cd=dev.get("dvcTypeCd"),
-            prod_name=dev.get("prodName"),
             prod_name_full=dev.get("prodNameFull"),
             order_no=dev.get("ordNo"),
             sell_type_cd=dev.get("sellTypeCd"),
@@ -260,7 +259,7 @@ class CowayDataClient(CowayMaintenanceClient):
             "dvcBrandCd": attr.dvc_brand_cd or "",
             "dvcTypeCd": attr.dvc_type_cd or "",
             "deviceType": attr.dvc_type_cd or "",
-            "prodName": attr.prod_name or "",
+            "prodName": attr.product_name or "",
             "orderNo": attr.order_no or "",
             "membershipYn": "N",
             "selfYn": attr.self_manage_yn or "N",
@@ -287,16 +286,6 @@ class CowayDataClient(CowayMaintenanceClient):
         response = await self._get_iot_endpoint(url, params, trcode=TrCode.AIR_HOME)
         if "error" in response:
             raise CowayError(f"IoT air home failed for {attr.name}: {response['error']}")
-        return response.get("data", {})
-
-    async def async_get_iot_filter_info(self, attr: DeviceAttributes) -> dict[str, Any]:
-        """Fetch filter info via the IoT JSON API."""
-
-        url = f"{Endpoint.IOT_BASE_URI}{Endpoint.IOT_AIR_HOME}/{attr.device_id}/filter-info"
-        params = self._iot_device_params(attr)
-        response = await self._get_iot_endpoint(url, params, trcode=TrCode.AIR_FILTER_INFO)
-        if "error" in response:
-            raise CowayError(f"IoT filter info failed for {attr.name}: {response['error']}")
         return response.get("data", {})
 
     async def async_get_iot_device_conn(self, attr: DeviceAttributes) -> dict[str, Any]:

@@ -144,7 +144,6 @@ Each `CowayPurifier` includes:
 |---|---|---|
 | `is_on` | `bool \| None` | Power state |
 | `auto_mode` | `bool \| None` | Auto mode |
-| `auto_eco_mode` | `bool \| None` | Auto eco mode |
 | `eco_mode` | `bool \| None` | Eco mode |
 | `night_mode` | `bool \| None` | Night mode |
 | `rapid_mode` | `bool \| None` | Rapid mode |

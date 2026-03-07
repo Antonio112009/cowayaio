@@ -53,7 +53,6 @@ class Endpoint(StrEnum):
     TOKEN_REFRESH = "/com/refresh-token"
     USER_INFO = "/com/my-info"
     PLACES = "/com/places"
-    AIR = "/air/devices"
     PURIFIER_HTML_BASE = "https://iocare2.coway.com/en"
     SECONDARY_BASE = "https://iocare2.coway.com/api/proxy/api/v1"
 
@@ -72,7 +71,6 @@ class TrCode(StrEnum):
     DEVICE_CONTROL = "CWIG0602"
     DEVICE_CONN = "CWIG0607"
     AIR_HOME = "CWIA0120"
-    AIR_FILTER_INFO = "CWIA0500"
     CONTROL_DEVICE = "CWIG0603"
 
 
