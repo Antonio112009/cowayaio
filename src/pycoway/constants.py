@@ -57,7 +57,7 @@ class Endpoint(StrEnum):
     PURIFIER_HTML_BASE = "https://iocare2.coway.com/en"
     SECONDARY_BASE = "https://iocare2.coway.com/api/proxy/api/v1"
 
-    # Homebridge-style JSON API (no HTML scraping needed)
+    # IoCare IoT JSON API (no HTML scraping needed)
     HB_BASE_URI = "https://iocareapi.iot.coway.com/api/v1"
     HB_USER_DEVICES = "/com/user-devices"
     HB_DEVICE_CONTROL = "/com/devices"  # /{id}/control

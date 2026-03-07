@@ -239,7 +239,7 @@ class TestBuildPurifier:
         assert purifier.odor_filter_pct == 35
 
     def test_hb_discovery_fields_populated(self):
-        """When device dict comes from HB user-devices, extended attrs are populated."""
+        """When device dict comes from IoT API user-devices, extended attrs are populated."""
         hb_device = {
             "barcode": "15902EUZ2282500520",
             "dvcModel": "AP-2015E(GRAPHITE_US)",
@@ -285,7 +285,7 @@ class TestBuildPurifier:
         assert attr.mqtt_device is True
 
     def test_legacy_device_has_none_hb_fields(self, sample_device, sample_parsed_info):
-        """Legacy device dict leaves HB-only fields as None/False."""
+        """Legacy device dict leaves IoT API-only fields as None/False."""
         purifier = build_purifier(sample_device, sample_parsed_info)
         attr = purifier.device_attr
 

@@ -1,4 +1,4 @@
-"""Tests for HB (homebridge-style) API endpoint constants and transport."""
+"""Tests for IoT JSON API endpoint constants and transport."""
 
 from unittest.mock import AsyncMock, MagicMock
 
@@ -34,7 +34,7 @@ class TestHBHeader:
         assert header["authorization"] == "Bearer test-token-123"
         assert header["Content-Type"] == "application/json"
         assert header["Accept"] == "*/*"
-        # HB header should NOT include 'region'
+        # IoT API header should NOT include 'region'
         assert "region" not in header
 
     def test_control_header_has_region(self):

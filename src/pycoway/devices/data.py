@@ -10,7 +10,7 @@ from pycoway.constants import (
     Endpoint,
     Header,
 )
-from pycoway.devices.models import CowayPurifier, PurifierData
+from pycoway.devices.models import CowayPurifier, DeviceAttributes, PurifierData
 from pycoway.devices.parser import (
     build_filter_dict,
     build_purifier,
@@ -191,4 +191,63 @@ class CowayDataClient(CowayMaintenanceClient):
         response = await self._get_endpoint(url, headers, None)
         if "error" in response:
             raise CowayError(f"Failed to get timer for purifier {name}: {response['error']}")
+        return response.get("data", {})
+
+    # ------------------------------------------------------------------
+    # IoT JSON API methods
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _hb_device_params(attr: DeviceAttributes) -> dict[str, str]:
+        """Build the query-string params the IoT API endpoints require."""
+        return {
+            "devId": attr.device_id or "",
+            "mqttDevice": str(attr.mqtt_device).lower(),
+            "dvcBrandCd": attr.dvc_brand_cd or "",
+            "dvcTypeCd": attr.dvc_type_cd or "",
+            "prodName": attr.prod_name or "",
+            "orderNo": attr.order_no or "",
+            "membershipYn": "N",
+            "selfYn": attr.self_manage_yn or "N",
+            "sellTypeCd": attr.sell_type_cd or "",
+        }
+
+    async def async_get_hb_device_control(self, attr: DeviceAttributes) -> dict[str, Any]:
+        """Fetch device control/status data via the IoT JSON API."""
+
+        url = f"{Endpoint.HB_BASE_URI}{Endpoint.HB_DEVICE_CONTROL}/{attr.device_id}/control"
+        params = self._hb_device_params(attr)
+        response = await self._get_hb_endpoint(url, params)
+        if "error" in response:
+            raise CowayError(f"IoT control-status failed for {attr.name}: {response['error']}")
+        return response.get("data", {})
+
+    async def async_get_hb_air_home(self, attr: DeviceAttributes) -> dict[str, Any]:
+        """Fetch air-quality home data via the IoT JSON API."""
+
+        url = f"{Endpoint.HB_BASE_URI}{Endpoint.HB_AIR_HOME}/{attr.device_id}/home"
+        params = self._hb_device_params(attr)
+        response = await self._get_hb_endpoint(url, params)
+        if "error" in response:
+            raise CowayError(f"IoT air home failed for {attr.name}: {response['error']}")
+        return response.get("data", {})
+
+    async def async_get_hb_filter_info(self, attr: DeviceAttributes) -> dict[str, Any]:
+        """Fetch filter info via the IoT JSON API."""
+
+        url = f"{Endpoint.HB_BASE_URI}{Endpoint.HB_AIR_FILTER_INFO}/{attr.device_id}/filter-info"
+        params = self._hb_device_params(attr)
+        response = await self._get_hb_endpoint(url, params)
+        if "error" in response:
+            raise CowayError(f"IoT filter info failed for {attr.name}: {response['error']}")
+        return response.get("data", {})
+
+    async def async_get_hb_device_conn(self, attr: DeviceAttributes) -> dict[str, Any]:
+        """Fetch device connection status via the IoT JSON API."""
+
+        url = f"{Endpoint.HB_BASE_URI}{Endpoint.HB_DEVICE_CONN}"
+        params = self._hb_device_params(attr)
+        response = await self._get_hb_endpoint(url, params)
+        if "error" in response:
+            raise CowayError(f"IoT device connection failed for {attr.name}: {response['error']}")
         return response.get("data", {})
