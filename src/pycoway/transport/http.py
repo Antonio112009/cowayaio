@@ -82,7 +82,7 @@ class CowayHttpClient:
         }
 
     def _construct_hb_header(self) -> dict[str, str]:
-        """Build header for HB (homebridge-style) JSON API calls."""
+        """Build header for the IoT JSON API calls."""
 
         return {
             "Content-Type": Header.CONTENT_JSON,
@@ -97,7 +97,7 @@ class CowayHttpClient:
         endpoint: str,
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """GET a homebridge-style JSON API endpoint."""
+        """GET an IoT JSON API endpoint."""
 
         headers = self._construct_hb_header()
         async with self._session.get(

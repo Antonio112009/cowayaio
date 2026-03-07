@@ -15,7 +15,7 @@ class DeviceAttributes:
     product_name: str | None
     place_id: str | None
 
-    # Extended fields from the HB (homebridge-style) API discovery response.
+    # Extended fields from the IoT API discovery response.
     # All default to None for backward compatibility with the legacy API path.
     dvc_brand_cd: str | None = None
     dvc_type_cd: str | None = None

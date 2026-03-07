@@ -242,3 +242,55 @@ def build_purifier(
         smart_mode_sensitivity=status.get("000A"),
         filters=build_filter_info_list(raw_filters) if raw_filters else None,
     )
+
+
+def extract_hb_parsed_info(
+    control_data: dict[str, Any],
+    air_data: dict[str, Any],
+    conn_data: dict[str, Any],
+) -> dict[str, Any]:
+    """Build the same parsed-info dict from IoT JSON API responses.
+
+    ``control_data`` comes from the control-status endpoint,
+    ``air_data`` from the air/home endpoint, and ``conn_data`` from
+    the devices-conn endpoint.  The returned dict has the same shape as
+    :func:`extract_parsed_info` so :func:`build_purifier` can consume
+    it unchanged.
+    """
+
+    # control-status → statusInfo.attributes  (same keys as HTML path)
+    control_status = control_data.get("controlStatusData", {})
+    status_attrs = control_status.get("data", {}).get("statusInfo", {}).get("attributes", {})
+
+    # control-status may also carry coreData / MCU info
+    mcu_info: dict[str, Any] = {}
+    for core in control_status.get("coreData", []):
+        inner = core.get("data", {})
+        if "currentMcuVer" in inner:
+            mcu_info = inner
+            break
+
+    # air/home → sensor readings and AQ grade
+    air_quality = air_data.get("airHomeData", {})
+    sensor_info: dict[str, Any] = {}
+    aq_grade: dict[str, Any] | None = None
+    if air_quality:
+        sensor_info = air_quality.get("sensorInfo", {}).get("attributes", {})
+        iaq = air_quality.get("iaqGrade")
+        aq_grade = {"iaqGrade": iaq} if iaq is not None else {}
+
+    # devices-conn → connection/network status
+    network_info: dict[str, Any] = {}
+    if conn_data:
+        network_info = {"wifiConnected": conn_data.get("netStatus") == "online"}
+
+    return {
+        "device_info": {},
+        "mcu_info": mcu_info,
+        "network_info": network_info,
+        "sensor_info": sensor_info,
+        "status_info": status_attrs,
+        "aq_grade": aq_grade,
+        "filter_info": {},
+        "timer_info": status_attrs.get("0008"),
+    }
