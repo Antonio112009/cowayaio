@@ -128,7 +128,7 @@ def _sensor_filter_pct(sensor_info: dict[str, Any], key: str) -> int | None:
 
 
 def build_purifier(
-    dev: dict[str, Any],
+    device_attr: DeviceAttributes,
     parsed_info: dict[str, Any],
     raw_filters: list[dict[str, Any]] | None = None,
 ) -> CowayPurifier:
@@ -139,25 +139,11 @@ def build_purifier(
     sensor = parsed_info["sensor_info"]
     filters = parsed_info["filter_info"]
 
-    device_attr = DeviceAttributes(
-        device_id=dev.get("deviceSerial") or dev.get("barcode"),
-        model=device_info.get("productName"),
-        model_code=dev.get("productModel") or dev.get("dvcModel"),
-        code=device_info.get("modelCode") or dev.get("prodType"),
-        name=dev.get("dvcNick"),
-        product_name=device_info.get("prodName") or dev.get("prodName"),
-        place_id=dev.get("placeId"),
-        dvc_brand_cd=dev.get("dvcBrandCd"),
-        dvc_type_cd=dev.get("dvcTypeCd"),
-        prod_name=dev.get("prodName"),
-        prod_name_full=dev.get("prodNameFull"),
-        order_no=dev.get("ordNo"),
-        sell_type_cd=dev.get("sellTypeCd"),
-        admdong_cd=dev.get("admdongCd"),
-        station_cd=dev.get("stationCd"),
-        self_manage_yn=dev.get("selfManageYn"),
-        mqtt_device=dev.get("comType") == "WIFI" or dev.get("wifiType") is not None,
-    )
+    # Enrich DeviceAttributes with fields from device_info if available.
+    if device_info:
+        device_attr.model = device_info.get("productName") or device_attr.model
+        device_attr.code = device_info.get("modelCode") or device_attr.code
+        device_attr.product_name = device_info.get("prodName") or device_attr.product_name
 
     network_status = parsed_info["network_info"].get("wifiConnected")
     if not network_status and network_status is not None:

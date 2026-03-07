@@ -22,9 +22,6 @@ class TestIOTEndpointConstants:
     def test_iot_air_home(self):
         assert Endpoint.IOT_AIR_HOME == "/air/devices"
 
-    def test_iot_air_filter_info(self):
-        assert Endpoint.IOT_AIR_FILTER_INFO == "/air/devices"
-
 
 class TestIOTHeader:
     def test_construct_iot_header(self):

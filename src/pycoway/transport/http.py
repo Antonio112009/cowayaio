@@ -48,7 +48,7 @@ class CowayHttpClient:
         url = f"{Endpoint.BASE_URI}{Endpoint.GET_TOKEN}"
         headers = {
             "content-type": Header.CONTENT_JSON,
-            "user-agent": Header.COWAY_USER_AGENT,
+            "user-agent": Header.USER_AGENT,
             "accept-language": Header.COWAY_LANGUAGE,
         }
         async with self._session.post(
@@ -69,29 +69,26 @@ class CowayHttpClient:
         ) as resp:
             return await self._response(resp)
 
-    def _construct_control_header(self) -> dict[str, str]:
-        """Build header for purifier control commands."""
-
-        return {
-            "Content-Type": Header.CONTENT_JSON,
-            "Accept": "*/*",
-            "accept-language": Header.COWAY_LANGUAGE,
-            "User-Agent": Header.COWAY_USER_AGENT,
-            "authorization": f"Bearer {self.access_token}",
-            "region": "NUS",
-        }
-
-    def _construct_iot_header(self, trcode: str = "") -> dict[str, str]:
-        """Build header for the IoT JSON API calls."""
+    def _build_auth_header(self, **extra: str) -> dict[str, str]:
+        """Build an authenticated header with optional extras."""
 
         headers = {
             "Content-Type": Header.CONTENT_JSON,
             "Accept": "*/*",
             "accept-language": Header.COWAY_LANGUAGE,
-            "User-Agent": Header.COWAY_USER_AGENT,
+            "User-Agent": Header.USER_AGENT,
             "authorization": f"Bearer {self.access_token}",
-            "profile": "prod",
         }
+        headers.update(extra)
+        return headers
+
+    def _construct_control_header(self) -> dict[str, str]:
+        """Build header for purifier control commands."""
+        return self._build_auth_header(region="NUS")
+
+    def _construct_iot_header(self, trcode: str = "") -> dict[str, str]:
+        """Build header for the IoT JSON API calls."""
+        headers = self._build_auth_header(profile="prod")
         if trcode:
             headers["trcode"] = trcode
         return headers
@@ -126,7 +123,7 @@ class CowayHttpClient:
             "accesstoken": self.access_token,
             "accept-language": Header.COWAY_LANGUAGE,
             "region": "NUS",
-            "user-agent": Header.HTML_USER_AGENT,
+            "user-agent": Header.USER_AGENT,
             "srcpath": Header.SOURCE_PATH,
             "deviceserial": serial,
         }

@@ -2,9 +2,9 @@
 
 import logging
 import os
+from enum import StrEnum
 
 from .__version__ import __version__ as version
-from .enums import StrEnum
 
 DEFAULT_TIMEZONE = "America/Kentucky/Louisville"
 
@@ -62,8 +62,7 @@ class Endpoint(StrEnum):
     IOT_USER_DEVICES = "/com/user-devices"
     IOT_DEVICE_CONTROL = "/com/devices"  # /{id}/control
     IOT_DEVICE_CONN = "/com/devices-conn"
-    IOT_AIR_HOME = "/air/devices"  # /{id}/home
-    IOT_AIR_FILTER_INFO = "/air/devices"  # /{id}/filter-info
+    IOT_AIR_HOME = "/air/devices"  # /{id}/home or /{id}/filter-info
 
 
 class TrCode(StrEnum):
@@ -90,8 +89,6 @@ class Header(StrEnum):
     CALLING_PAGE = "product"
     CONTENT_JSON = "application/json"
     COWAY_LANGUAGE = "en-US,en;q=0.9"
-    COWAY_USER_AGENT = f"pycoway/{version}"
-    HTML_USER_AGENT = f"pycoway/{version}"
     SOURCE_PATH = "iOS"
     THEME = "light"
     USER_AGENT = f"pycoway/{version}"

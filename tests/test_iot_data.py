@@ -185,7 +185,7 @@ class TestAsyncGetIOTFilterInfo:
         await client.async_get_iot_filter_info(iot_device_attr)
         url = client._get_iot_endpoint.call_args[0][0]
         assert url == (
-            f"{Endpoint.IOT_BASE_URI}{Endpoint.IOT_AIR_FILTER_INFO}/15902EUZ2282500520/filter-info"
+            f"{Endpoint.IOT_BASE_URI}{Endpoint.IOT_AIR_HOME}/15902EUZ2282500520/filter-info"
         )
 
     async def test_raises_on_error(self, iot_device_attr):

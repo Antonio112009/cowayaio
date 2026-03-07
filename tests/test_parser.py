@@ -1,5 +1,6 @@
 """Tests for parser module."""
 
+from pycoway.devices.models import DeviceAttributes
 from pycoway.devices.parser import (
     build_filter_dict,
     build_filter_info_list,
@@ -170,23 +171,25 @@ class TestBuildPurifier:
 
     def test_iot_discovery_fields_populated(self):
         """When device dict comes from IoT API user-devices, extended attrs are populated."""
-        iot_device = {
-            "barcode": "15902EUZ2282500520",
-            "dvcModel": "AP-2015E(GRAPHITE_US)",
-            "dvcNick": "HH AIR PURIFIER",
-            "prodType": "02EUZ",
-            "prodName": "AIRMEGA",
-            "prodNameFull": "AIRMEGA 300s/400s",
-            "dvcBrandCd": "MG",
-            "dvcTypeCd": "004",
-            "ordNo": "ORD1WBGmBa7P",
-            "sellTypeCd": "1",
-            "admdongCd": "GB",
-            "stationCd": "GB",
-            "selfManageYn": "N",
-            "comType": "WIFI",
-            "wifiType": "M",
-        }
+        iot_attr = DeviceAttributes(
+            device_id="15902EUZ2282500520",
+            model=None,
+            model_code="AP-2015E(GRAPHITE_US)",
+            code="02EUZ",
+            name="HH AIR PURIFIER",
+            product_name="AIRMEGA",
+            place_id=None,
+            dvc_brand_cd="MG",
+            dvc_type_cd="004",
+            prod_name="AIRMEGA",
+            prod_name_full="AIRMEGA 300s/400s",
+            order_no="ORD1WBGmBa7P",
+            sell_type_cd="1",
+            admdong_cd="GB",
+            station_cd="GB",
+            self_manage_yn="N",
+            mqtt_device=True,
+        )
         empty_parsed = {
             "mcu_info": {},
             "sensor_info": {},
@@ -197,7 +200,7 @@ class TestBuildPurifier:
             "filter_info": {},
             "timer_info": {},
         }
-        purifier = build_purifier(iot_device, empty_parsed)
+        purifier = build_purifier(iot_attr, empty_parsed)
         attr = purifier.device_attr
 
         assert attr.device_id == "15902EUZ2282500520"

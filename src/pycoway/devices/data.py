@@ -169,7 +169,7 @@ class CowayDataClient(CowayMaintenanceClient):
                 parsed_info["filter_info"] = build_filter_dict(filter_info)
                 LOGGER.debug(f"{nick} filter dict: {parsed_info['filter_info']}")
 
-                purifier = build_purifier(dev, parsed_info, raw_filters=filter_info)
+                purifier = build_purifier(attr, parsed_info, raw_filters=filter_info)
                 device_data[purifier.device_attr.device_id] = purifier
                 LOGGER.debug(f"Finished CowayPurifier for {nick}")
         finally:
@@ -197,7 +197,7 @@ class CowayDataClient(CowayMaintenanceClient):
             "accept": "application/json, text/plain, */*",
             "authorization": f"Bearer {self.access_token}",
             "accept-language": Header.COWAY_LANGUAGE,
-            "user-agent": Header.HTML_USER_AGENT,
+            "user-agent": Header.USER_AGENT,
         }
         params = {
             "membershipYn": "N",
@@ -292,7 +292,7 @@ class CowayDataClient(CowayMaintenanceClient):
     async def async_get_iot_filter_info(self, attr: DeviceAttributes) -> dict[str, Any]:
         """Fetch filter info via the IoT JSON API."""
 
-        url = f"{Endpoint.IOT_BASE_URI}{Endpoint.IOT_AIR_FILTER_INFO}/{attr.device_id}/filter-info"
+        url = f"{Endpoint.IOT_BASE_URI}{Endpoint.IOT_AIR_HOME}/{attr.device_id}/filter-info"
         params = self._iot_device_params(attr)
         response = await self._get_iot_endpoint(url, params, trcode=TrCode.AIR_FILTER_INFO)
         if "error" in response:

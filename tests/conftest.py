@@ -8,16 +8,21 @@ import pytest
 # Keep direct test runs working with the src/ layout.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from pycoway.devices.models import DeviceAttributes  # noqa: E402
+
 
 @pytest.fixture
-def sample_device() -> dict:
-    """A minimal device dict as returned by the Coway API."""
-    return {
-        "deviceSerial": "ABC123",
-        "productModel": "AIRMEGA-250S",
-        "dvcNick": "Living Room",
-        "placeId": "place-001",
-    }
+def sample_device() -> DeviceAttributes:
+    """A minimal DeviceAttributes as constructed from a Coway API device."""
+    return DeviceAttributes(
+        device_id="ABC123",
+        model=None,
+        model_code="AIRMEGA-250S",
+        code=None,
+        name="Living Room",
+        product_name=None,
+        place_id="place-001",
+    )
 
 
 @pytest.fixture
