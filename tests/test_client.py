@@ -1,9 +1,13 @@
 """Tests for public client behavior and auth fallbacks."""
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+from yarl import URL
 
 from pycoway.account.auth import CowayAuthClient
 from pycoway.client import CowayClient
+from pycoway.exceptions import AuthError
 
 
 class _MockPostContext:
@@ -48,6 +52,32 @@ class TestCowayClient:
             client.login.assert_awaited_once()
         finally:
             await client.close()
+
+
+class TestGetAuthCode:
+    def _client_with_redirect(self, url: str) -> CowayAuthClient:
+        client = CowayAuthClient("email@example.com", "password", session=_MockSession())
+        resp = MagicMock()
+        resp.url = URL(url)
+        client._post_auth = AsyncMock(return_value=(resp, False))
+        return client
+
+    async def test_extracts_code_from_query(self):
+        client = self._client_with_redirect(
+            "https://example.com/redirect?code=auth-code-123&state=xyz"
+        )
+        assert await client._get_auth_code("https://login", {}) == "auth-code-123"
+
+    async def test_code_not_last_param(self):
+        client = self._client_with_redirect(
+            "https://example.com/redirect?state=xyz&code=auth-code-123&session_state=abc"
+        )
+        assert await client._get_auth_code("https://login", {}) == "auth-code-123"
+
+    async def test_missing_code_raises(self):
+        client = self._client_with_redirect("https://example.com/login?session_code=not-it")
+        with pytest.raises(AuthError):
+            await client._get_auth_code("https://login", {})
 
 
 class TestCowayAuthClient:

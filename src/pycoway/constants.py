@@ -1,5 +1,6 @@
 """Constants for pycoway."""
 
+import functools
 import logging
 import os
 from enum import StrEnum
@@ -44,6 +45,12 @@ def _detect_timezone() -> str:
     return DEFAULT_TIMEZONE
 
 
+@functools.lru_cache(maxsize=1)
+def get_timezone() -> str:
+    """Return the detected system timezone (detected once, then cached)."""
+    return _detect_timezone()
+
+
 class Endpoint(StrEnum):
     BASE_URI = "https://iocare.iotsvc.coway.com/api/v1"
     GET_TOKEN = "/com/token"
@@ -78,7 +85,6 @@ class Parameter(StrEnum):
     APP_VERSION = "2.15.0"
     CLIENT_ID = "cwid-prd-iocare-plus-25MJGcYX"
     CLIENT_NAME = "IOCARE"
-    TIMEZONE = _detect_timezone()
 
 
 class Header(StrEnum):

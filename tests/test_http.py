@@ -63,8 +63,8 @@ class TestResponse:
             json_data={"message": str(ErrorMessages.EXPIRED_TOKEN)},
             text_data="Unauthorized",
         )
-        result = await CowayHttpClient._response(resp)
-        assert result == {"error": str(ErrorMessages.EXPIRED_TOKEN)}
+        with pytest.raises(AuthError):
+            await CowayHttpClient._response(resp)
 
     async def test_non_200_json_error_key(self):
         resp = _mock_response(
