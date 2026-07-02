@@ -152,7 +152,7 @@ class CowayHttpClient:
             except (ValueError, ContentTypeError) as exc:
                 raise CowayError(f"Could not return json: {error}") from exc
 
-            if "error" in error_json:
+            if not isinstance(error_json, dict) or "error" in error_json:
                 return {"error": error_json}
 
             message = error_json.get("message")
@@ -170,12 +170,11 @@ class CowayHttpClient:
 
         # Sometimes an unauthorized message comes back with a 200 status.
         if "error" in response:
-            if response["error"]["message"] == ErrorMessages.INVALID_REFRESH_TOKEN:
-                raise AuthError(
-                    f"Coway Auth error: Coway IoCare authentication failed: "
-                    f"{ErrorMessages.INVALID_REFRESH_TOKEN}"
-                )
-            raise CowayError(f"Coway error message: {response['error']['message']}")
+            error = response["error"]
+            message = error.get("message") if isinstance(error, dict) else error
+            if message == ErrorMessages.INVALID_REFRESH_TOKEN:
+                raise AuthError(f"Coway Auth error: Coway IoCare authentication failed: {message}")
+            raise CowayError(f"Coway error message: {message}")
         return response
 
     @staticmethod
