@@ -126,7 +126,13 @@ jobs:
 
   sync-development:
     needs: bump-version
-    if: needs.bump-version.result == 'success'
+    # Run for no-release merges too (bump-version is skipped then), so the
+    # merge commit on main always flows back into development.
+    if: >
+      always()
+      && github.event.pull_request.merged == true
+      && github.event.pull_request.head.ref == 'development'
+      && (needs.bump-version.result == 'success' || needs.bump-version.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -139,8 +145,20 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git merge origin/main --no-edit
-          git push origin development
+          # Retry so a racing push to development can't leave the version
+          # bump stranded on main.
+          for attempt in 1 2 3; do
+            git fetch origin main development
+            git reset --hard origin/development
+            git merge origin/main --no-edit
+            if git push origin development; then
+              exit 0
+            fi
+            echo "Push rejected (attempt ${attempt}); retrying."
+            sleep 5
+          done
+          echo "::error::Failed to sync development with main after 3 attempts."
+          exit 1
 
   publish:
     needs: bump-version
