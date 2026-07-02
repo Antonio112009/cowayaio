@@ -122,6 +122,8 @@ def _mock_iot_client(response: dict) -> CowayDataClient:
     """Create a CowayDataClient with a mocked _get_iot_endpoint."""
     client = CowayDataClient.__new__(CowayDataClient)
     client._get_iot_endpoint = AsyncMock(return_value=response)
+    client.check_token = True
+    client._check_token = AsyncMock()
     return client
 
 

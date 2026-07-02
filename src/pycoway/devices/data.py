@@ -52,7 +52,7 @@ class CowayDataClient(CowayMaintenanceClient):
                 f"Place Name: {place.get('placeName')}, "
                 f"Device Count: {place.get('deviceCnt')}"
             )
-            if place["deviceCnt"] == 0:
+            if not place.get("deviceCnt"):
                 continue
 
             url = f"{Endpoint.BASE_URI}{Endpoint.PLACES}/{place['placeId']}/devices"
@@ -74,7 +74,7 @@ class CowayDataClient(CowayMaintenanceClient):
 
             devices = response.get("data", {}).get("content")
             if devices:
-                purifiers.extend(d for d in devices if d["categoryName"] == CATEGORY_NAME)
+                purifiers.extend(d for d in devices if d.get("categoryName") == CATEGORY_NAME)
             else:
                 LOGGER.debug(
                     f"No devices at Place ID: {place.get('placeId')}, "
@@ -220,6 +220,9 @@ class CowayDataClient(CowayMaintenanceClient):
     async def async_get_iot_user_devices(self) -> list[dict[str, Any]]:
         """Fetch the IoT device list which contains ordNo, dvcBrandCd, etc."""
 
+        if self.check_token:
+            await self._check_token()
+
         url = f"{Endpoint.IOT_BASE_URI}{Endpoint.IOT_USER_DEVICES}"
         params = {"pageIndex": "0", "pageSize": "100"}
         response = await self._get_iot_endpoint(url, params, trcode=TrCode.USER_DEVICES)
@@ -276,6 +279,9 @@ class CowayDataClient(CowayMaintenanceClient):
     async def async_get_iot_device_control(self, attr: DeviceAttributes) -> dict[str, Any]:
         """Fetch device control/status data via the IoT JSON API."""
 
+        if self.check_token:
+            await self._check_token()
+
         url = f"{Endpoint.IOT_BASE_URI}{Endpoint.IOT_DEVICE_CONTROL}/{attr.device_id}/control"
         params = self._iot_device_params(attr)
         response = await self._get_iot_endpoint(url, params, trcode=TrCode.DEVICE_CONTROL)
@@ -286,6 +292,9 @@ class CowayDataClient(CowayMaintenanceClient):
     async def async_get_iot_air_home(self, attr: DeviceAttributes) -> dict[str, Any]:
         """Fetch air-quality home data via the IoT JSON API."""
 
+        if self.check_token:
+            await self._check_token()
+
         url = f"{Endpoint.IOT_BASE_URI}{Endpoint.IOT_AIR_HOME}/{attr.device_id}/home"
         params = self._iot_device_params(attr)
         response = await self._get_iot_endpoint(url, params, trcode=TrCode.AIR_HOME)
@@ -295,6 +304,9 @@ class CowayDataClient(CowayMaintenanceClient):
 
     async def async_get_iot_device_conn(self, attr: DeviceAttributes) -> dict[str, Any]:
         """Fetch device connection status via the IoT JSON API."""
+
+        if self.check_token:
+            await self._check_token()
 
         url = f"{Endpoint.IOT_BASE_URI}{Endpoint.IOT_DEVICE_CONN}"
         params = self._iot_device_params(attr)
