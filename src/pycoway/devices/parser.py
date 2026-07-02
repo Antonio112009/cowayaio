@@ -189,6 +189,9 @@ def build_purifier(
         night_mode=mode_value == 2,
         rapid_mode=mode_value == 5,
         fan_speed=status.get("0003"),
+        # "0007" semantics are model-dependent: basic models report 2 for
+        # on; multi-mode models (250S/IconS) invert this — consumers with
+        # those models should read light_mode against LightMode instead.
         light_on=status.get("0007") == 2,
         light_mode=status.get("0007"),
         button_lock=status.get("0024"),

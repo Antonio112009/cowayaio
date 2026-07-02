@@ -82,7 +82,9 @@ class CowayControlClient(CowayDataClient):
 
     async def async_set_light(self, device_attr: DeviceAttributes, light_on: bool) -> None:
         """Provide light_on as True for On and False for Off.
-        NOT used for 250s purifiers.
+        NOT used for 250s purifiers: basic on/off models use wire value
+        2 for on and 0 for off; multi-mode models invert this — use
+        async_set_light_mode with LightMode for those.
         """
         await self._send_control(device_attr, CommandCode.LIGHT, "2" if light_on else "0", "light")
 

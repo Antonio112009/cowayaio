@@ -196,7 +196,7 @@ class TestBuildPurifier:
             "network_info": {},
             "aq_grade": {},
             "filter_info": {},
-            "timer_info": {},
+            "timer_info": None,
         }
         purifier = build_purifier(iot_attr, empty_parsed)
         attr = purifier.device_attr

@@ -48,6 +48,11 @@ class TestResponse:
         with pytest.raises(CowayError, match="some error"):
             await CowayHttpClient._response(resp)
 
+    async def test_error_key_string_value(self):
+        resp = _mock_response(json_data={"error": "plain string error"})
+        with pytest.raises(CowayError, match="plain string error"):
+            await CowayHttpClient._response(resp)
+
     async def test_non_200_bad_token(self):
         resp = _mock_response(
             status=401,
@@ -65,6 +70,15 @@ class TestResponse:
         )
         with pytest.raises(AuthError):
             await CowayHttpClient._response(resp)
+
+    async def test_non_200_non_dict_json(self):
+        resp = _mock_response(
+            status=500,
+            text_data="Server Error",
+        )
+        resp.json = AsyncMock(return_value=["unexpected", "list"])
+        result = await CowayHttpClient._response(resp)
+        assert result == {"error": ["unexpected", "list"]}
 
     async def test_non_200_json_error_key(self):
         resp = _mock_response(

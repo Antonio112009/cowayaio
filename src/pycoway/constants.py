@@ -108,6 +108,13 @@ class ErrorMessages(StrEnum):
 
 
 class LightMode(StrEnum):
+    """Light values for the ``0007`` control code on multi-mode models.
+
+    The meaning of ``0007`` is model-dependent: basic on/off models use
+    ``2`` for on and ``0`` for off (see ``async_set_light``), while
+    multi-mode models (AIRMEGA 250S, IconS) use the values below.
+    """
+
     AQI_OFF = "1"
     OFF = "2"
     HALF_OFF = "3"  # For IconS only
