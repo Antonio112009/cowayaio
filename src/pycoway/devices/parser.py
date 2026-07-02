@@ -231,9 +231,8 @@ def extract_iot_parsed_info(
     contains ``controlStatus``, ``netStatus``, etc.),
     ``air_data`` from the air/home endpoint (``data`` contains ``IAQ``,
     ``prodStatus``, ``filterList``, etc.), and ``conn_data`` from the
-    devices-conn endpoint.  The returned dict has the same shape as
-    :func:`extract_parsed_info` so :func:`build_purifier` can consume
-    it unchanged.
+    devices-conn endpoint.  The returned dict has the shape
+    :func:`build_purifier` expects.
     """
 
     # --- Control status (hex-coded keys, string values → int) ----------

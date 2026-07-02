@@ -52,10 +52,9 @@ class CowayMaintenanceClient(CowayAuthClient):
 
         now = datetime.now()
 
-        # Skip the full list call if we checked recently and have a cached result.
+        # Skip the full list call if we checked recently.
         if (
-            self.server_maintenance is not None
-            and self._notices_checked_at is not None
+            self._notices_checked_at is not None
             and (now - self._notices_checked_at).total_seconds() < NOTICES_CHECK_INTERVAL
         ):
             LOGGER.debug("Maintenance notice cache is fresh. Skipping.")

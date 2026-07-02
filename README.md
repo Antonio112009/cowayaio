@@ -150,7 +150,7 @@ Each `CowayPurifier` includes:
 | `light_mode` | `int \| None` | Device-specific light mode |
 | `button_lock` | `int \| None` | Button lock state |
 | `smart_mode_sensitivity` | `int \| None` | Smart mode sensitivity level |
-| `timer` | `str \| None` | Configured off timer |
+| `timer` | `int \| None` | Configured off timer |
 | `timer_remaining` | `int \| None` | Remaining timer (minutes) |
 
 ### Air Quality

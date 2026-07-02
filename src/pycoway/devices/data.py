@@ -84,7 +84,12 @@ class CowayDataClient(CowayMaintenanceClient):
         return purifiers
 
     async def async_get_purifiers_data(self) -> PurifierData:
-        """Return dataclass with all Purifier Devices."""
+        """Return dataclass with all Purifier Devices.
+
+        Not safe for concurrent calls on the same client instance: it
+        temporarily disables token checking (``self.check_token``) for
+        the duration of the batch.
+        """
 
         LOGGER.debug(f"Getting purifiers data for {self.username}")
         if not self.places:
@@ -165,9 +170,7 @@ class CowayDataClient(CowayMaintenanceClient):
 
                 # Rich filter data (dates, pollutants, descriptions) from legacy API.
                 LOGGER.debug(f"Fetching filter info for {nick}")
-                filter_info = await self.async_fetch_filter_status(
-                    dev["placeId"], dev["deviceSerial"], nick
-                )
+                filter_info = await self.async_fetch_filter_status(place_id, serial, nick)
                 parsed_info["filter_info"] = build_filter_dict(filter_info)
                 LOGGER.debug(f"{nick} filter dict: {parsed_info['filter_info']}")
 

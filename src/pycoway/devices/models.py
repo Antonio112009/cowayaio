@@ -67,7 +67,7 @@ class CowayPurifier:
     light_on: bool | None
     light_mode: int | None
     button_lock: int | None
-    timer: str | None
+    timer: int | None
     timer_remaining: int | None
     pre_filter_pct: int | None
     max2_pct: int | None
