@@ -15,6 +15,7 @@ from pycoway.constants import (
     ErrorMessages,
     Header,
     Parameter,
+    get_timezone,
 )
 from pycoway.exceptions import (
     AuthError,
@@ -207,9 +208,8 @@ class CowayAuthClient(CowayHttpClient):
             )
             LOGGER.debug(f"Auth code skip password response: {response}")
 
-        query_string = response.url.query_string
-        prefix, sep, code = query_string.partition("code=")
-        if not sep or not code:
+        code = response.url.query.get("code")
+        if not code:
             raise AuthError(
                 "Coway authentication did not return an auth code. "
                 "This usually means the credentials were rejected silently "
@@ -306,8 +306,9 @@ class CowayAuthClient(CowayHttpClient):
             await self.login()
             return
 
-        self.access_token = response["data"].get("accessToken")
-        self.refresh_token = response["data"].get("refreshToken")
+        token_data = response.get("data") or {}
+        self.access_token = token_data.get("accessToken")
+        self.refresh_token = token_data.get("refreshToken")
         if self.access_token is None or self.refresh_token is None:
             raise CowayError(f"Failed to refresh tokens for {self.username}. Response: {response}")
 
@@ -361,7 +362,7 @@ class CowayAuthClient(CowayHttpClient):
             "langCd": Header.ACCEPT_LANG,
             "pageIndex": "1",
             "pageSize": "20",
-            "timezoneId": Parameter.TIMEZONE,
+            "timezoneId": get_timezone(),
         }
         headers = await self._create_endpoint_header()
         LOGGER.debug(f"Getting places for {self.username}")

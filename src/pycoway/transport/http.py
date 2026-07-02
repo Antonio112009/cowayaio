@@ -12,6 +12,7 @@ from pycoway.constants import (
     ErrorMessages,
     Header,
     Parameter,
+    get_timezone,
 )
 from pycoway.exceptions import (
     AuthError,
@@ -118,7 +119,7 @@ class CowayHttpClient:
             "callingpage": Header.CALLING_PAGE,
             "accept": Header.ACCEPT,
             "dvcnick": nick_name,
-            "timezoneid": Parameter.TIMEZONE,
+            "timezoneid": get_timezone(),
             "appversion": Parameter.APP_VERSION,
             "accesstoken": self.access_token or "",
             "accept-language": Header.COWAY_LANGUAGE,
@@ -155,16 +156,8 @@ class CowayHttpClient:
                 return {"error": error_json}
 
             message = error_json.get("message")
-            if message == ErrorMessages.BAD_TOKEN:
-                raise AuthError(
-                    f"Coway Auth error: Coway IoCare authentication failed; "
-                    f"{ErrorMessages.BAD_TOKEN}"
-                )
-            if message == ErrorMessages.EXPIRED_TOKEN:
-                LOGGER.debug(
-                    f"Current access token has expired. Error: {ErrorMessages.EXPIRED_TOKEN}"
-                )
-                return {"error": ErrorMessages.EXPIRED_TOKEN}
+            if message in (ErrorMessages.BAD_TOKEN, ErrorMessages.EXPIRED_TOKEN):
+                raise AuthError(f"Coway Auth error: Coway IoCare authentication failed; {message}")
             return {"error": error_json}
 
         try:

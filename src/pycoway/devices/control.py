@@ -30,7 +30,7 @@ class CowayControlClient(CowayDataClient):
                 raise CowayError(
                     f"Failed to execute {command_name} command. "
                     f"Error code: {header['error_code']}, "
-                    f"Error message: {header['error_text']}"
+                    f"Error message: {header.get('error_text', 'unknown')}"
                 )
         else:
             raise CowayError(f"Failed to execute {command_name} command. Response: {response}")
