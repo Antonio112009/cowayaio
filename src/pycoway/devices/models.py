@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 
 
-@dataclass
+@dataclass(slots=True)
 class DeviceAttributes:
     """Device identification attributes for a Coway purifier."""
 
@@ -27,7 +27,7 @@ class DeviceAttributes:
     mqtt_device: bool = field(default=False)
 
 
-@dataclass
+@dataclass(slots=True)
 class FilterInfo:
     """Detailed information about a single purifier filter/supply."""
 
@@ -44,14 +44,14 @@ class FilterInfo:
     server_reset: bool
 
 
-@dataclass
+@dataclass(slots=True)
 class PurifierData:
     """Dataclass for Purifier Data"""
 
     purifiers: dict[str, "CowayPurifier"]
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class CowayPurifier:
     """Dataclass for Coway IoCare Purifier"""
 

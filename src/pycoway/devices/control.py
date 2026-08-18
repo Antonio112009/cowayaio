@@ -94,7 +94,9 @@ class CowayControlClient(CowayDataClient):
         """Sets light mode for purifiers that support more than On/Off.
         See LightMode constant for available options.
         """
-        await self._send_control(device_attr, CommandCode.LIGHT, light_mode, "light mode")
+        # The API expects the value as a string (e.g. "2"), while LightMode
+        # is an IntEnum so it compares equal to CowayPurifier.light_mode.
+        await self._send_control(device_attr, CommandCode.LIGHT, str(int(light_mode)), "light mode")
 
     async def async_set_timer(
         self, device_attr: DeviceAttributes, time: Literal["0", "60", "120", "240", "480"]
@@ -134,7 +136,7 @@ class CowayControlClient(CowayDataClient):
             "refreshFlag": False,
         }
 
-        async with self._session.post(
+        async with self._ensure_session().post(
             url, headers=headers, data=json.dumps(data), timeout=self.timeout
         ) as resp:
             return await self._control_command_response(resp)
@@ -163,7 +165,7 @@ class CowayControlClient(CowayDataClient):
             "refreshFlag": False,
         }
 
-        async with self._session.post(
+        async with self._ensure_session().post(
             url, headers=headers, data=json.dumps(data), timeout=self.timeout
         ) as resp:
             response = await self._control_command_response(resp)

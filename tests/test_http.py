@@ -134,10 +134,19 @@ class TestControlCommandResponse:
 
 
 class TestContextManager:
-    async def test_async_context_manager(self):
+    async def test_session_created_lazily_and_closed(self):
         async with CowayHttpClient() as client:
-            assert client._session is not None
-        assert client._session.closed
+            # No request made yet — the session must not exist.
+            assert client._session is None
+            session = client._ensure_session()
+            assert client._session is session
+            assert client._ensure_session() is session
+        assert session.closed
+
+    async def test_close_without_session_is_noop(self):
+        async with CowayHttpClient() as client:
+            pass
+        assert client._session is None
 
     async def test_external_session_not_closed(self):
         from aiohttp import ClientSession
@@ -146,6 +155,7 @@ class TestContextManager:
         try:
             async with CowayHttpClient(session=session) as client:
                 assert client._owns_session is False
+                assert client._ensure_session() is session
             # External session should NOT be closed
             assert not session.closed
         finally:

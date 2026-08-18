@@ -1,11 +1,48 @@
 """Tests for parser module."""
 
+import json
+
+import pytest
+
+from pycoway.constants import LightMode
 from pycoway.devices.models import DeviceAttributes
 from pycoway.devices.parser import (
     build_filter_dict,
     build_filter_info_list,
     build_purifier,
+    parse_purifier_html,
 )
+from pycoway.exceptions import CowayError
+
+
+class TestParsePurifierHtml:
+    def test_plain_json(self):
+        html = (
+            '<script>window.__DATA__ = {"children": [{"coreData": [], "sensorInfo": {}}]}</script>'
+        )
+        result = parse_purifier_html(html, "Test")
+        assert result == {"coreData": [], "sensorInfo": {}}
+
+    def test_js_escaped_json(self):
+        """JSON embedded as an escaped JS string is decoded losslessly."""
+        inner = {
+            "children": [{"coreData": [], "note": 'line1\nline2 "quoted"'}],
+            "sensorInfo": {},
+        }
+        # json.dumps twice mimics the page embedding JSON inside a JS string.
+        embedded = json.dumps(json.dumps(inner))
+        html = f"<script>self.__next_f.push([1,{embedded}])</script>"
+        result = parse_purifier_html(html, "Test")
+        assert result == {"coreData": [], "note": 'line1\nline2 "quoted"'}
+
+    def test_no_children_returns_none(self):
+        html = '<script>{"sensorInfo": {}}</script>'
+        assert parse_purifier_html(html, "Test") is None
+
+    def test_unparseable_raises(self):
+        html = "<script>sensorInfo {not json</script>"
+        with pytest.raises(CowayError, match="Failed to parse purifier HTML"):
+            parse_purifier_html(html, "Test")
 
 
 class TestBuildFilterDict:
@@ -157,6 +194,15 @@ class TestBuildPurifier:
         sample_parsed_info["status_info"]["0002"] = 6
         p = build_purifier(sample_device, sample_parsed_info)
         assert p.eco_mode is True
+
+    def test_light_mode_compares_with_lightmode_enum(self, sample_device, sample_parsed_info):
+        sample_parsed_info["status_info"]["0007"] = 2
+        purifier = build_purifier(sample_device, sample_parsed_info)
+        assert purifier.light_mode == LightMode.OFF
+
+        sample_parsed_info["status_info"]["0007"] = 0
+        purifier = build_purifier(sample_device, sample_parsed_info)
+        assert purifier.light_mode == LightMode.ON
 
     def test_no_aq_grade(self, sample_device, sample_parsed_info):
         sample_parsed_info["aq_grade"] = None
