@@ -27,14 +27,25 @@ class CowayHttpClient:
     """Low-level HTTP transport for Coway API."""
 
     def __init__(self, session: ClientSession | None = None, timeout: int = TIMEOUT) -> None:
-        self._session: ClientSession = session if session else ClientSession()
+        self._session: ClientSession | None = session
         self._owns_session: bool = session is None
         self.timeout: ClientTimeout = ClientTimeout(total=timeout)
         self.access_token: str | None = None
 
+    def _ensure_session(self) -> ClientSession:
+        """Return the HTTP session, creating it lazily on first use.
+
+        Deferring creation to the first request means the session is
+        always created inside a running event loop, even when the client
+        itself was instantiated in synchronous code.
+        """
+        if self._session is None:
+            self._session = ClientSession()
+        return self._session
+
     async def close(self) -> None:
         """Close the underlying HTTP session if we created it."""
-        if self._owns_session and self._session and not self._session.closed:
+        if self._owns_session and self._session is not None and not self._session.closed:
             await self._session.close()
 
     async def __aenter__(self) -> "CowayHttpClient":
@@ -52,7 +63,7 @@ class CowayHttpClient:
             "user-agent": Header.USER_AGENT,
             "accept-language": Header.COWAY_LANGUAGE,
         }
-        async with self._session.post(
+        async with self._ensure_session().post(
             url, headers=headers, data=json.dumps(data), timeout=self.timeout
         ) as resp:
             return await self._response(resp)
@@ -65,7 +76,7 @@ class CowayHttpClient:
     ) -> dict[str, Any]:
         """GET an authorized API endpoint."""
 
-        async with self._session.get(
+        async with self._ensure_session().get(
             endpoint, headers=headers, params=params, timeout=self.timeout
         ) as resp:
             return await self._response(resp)
@@ -103,7 +114,7 @@ class CowayHttpClient:
         """GET an IoT JSON API endpoint."""
 
         headers = self._construct_iot_header(trcode)
-        async with self._session.get(
+        async with self._ensure_session().get(
             endpoint, headers=headers, params=params, timeout=self.timeout
         ) as resp:
             return await self._response(resp)
@@ -136,7 +147,7 @@ class CowayHttpClient:
             "gravityUnit": "lb",
         }
         LOGGER.debug(f"Fetching purifier HTML page at {url}")
-        async with self._session.get(
+        async with self._ensure_session().get(
             url, headers=headers, params=params, timeout=self.timeout
         ) as resp:
             return await resp.text()

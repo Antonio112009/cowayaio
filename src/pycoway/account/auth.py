@@ -29,6 +29,18 @@ from pycoway.transport.http import CowayHttpClient
 
 LOGGER = logging.getLogger(__name__)
 
+DEFAULT_TOKEN_LIFETIME = 3600  # seconds, used when the API omits expiresIn
+
+
+def _token_lifetime(token_data: dict[str, Any]) -> int:
+    """Extract the token lifetime in seconds, falling back to the default."""
+    expires_in = token_data.get("expiresIn", token_data.get("expires_in"))
+    try:
+        lifetime = int(expires_in)
+    except (TypeError, ValueError):
+        return DEFAULT_TOKEN_LIFETIME
+    return lifetime if lifetime > 0 else DEFAULT_TOKEN_LIFETIME
+
 
 class CowayAuthClient(CowayHttpClient):
     """Coway client with authentication and account setup."""
@@ -70,14 +82,13 @@ class CowayAuthClient(CowayHttpClient):
             "redirect_uri": Endpoint.REDIRECT_URL,
             "ui_locales": "en",
         }
+        session = self._ensure_session()
         # Clear only Coway/keycloak cookies so we don't wipe unrelated cookies
         # when the caller passed in a shared ClientSession.
         for domain in ("id.coway.com", "iocare.iotsvc.coway.com", "iocareapi.iot.coway.com"):
-            self._session.cookie_jar.clear_domain(domain)
+            session.cookie_jar.clear_domain(domain)
         LOGGER.debug(f"Sending request to endpoint {url}")
-        async with self._session.get(
-            url, headers=headers, params=params, timeout=self.timeout
-        ) as resp:
+        async with session.get(url, headers=headers, params=params, timeout=self.timeout) as resp:
             html_page = await resp.text()
             return resp, html_page
 
@@ -90,7 +101,7 @@ class CowayAuthClient(CowayHttpClient):
     ) -> tuple[str | ClientResponse, bool]:
         """POST credentials / password-skip to the authentication endpoint."""
 
-        async with self._session.post(
+        async with self._ensure_session().post(
             url, cookies=cookies, headers=headers, data=data, timeout=self.timeout
         ) as resp:
             if resp.content_type != "text/html":
@@ -140,8 +151,8 @@ class CowayAuthClient(CowayHttpClient):
 
         login_url, cookies = await self._get_login_cookies()
         auth_code = await self._get_auth_code(login_url, cookies)
-        self.access_token, self.refresh_token = await self._get_token(auth_code)
-        self.token_expiration = datetime.now() + timedelta(seconds=3600)
+        self.access_token, self.refresh_token, lifetime = await self._get_token(auth_code)
+        self.token_expiration = datetime.now() + timedelta(seconds=lifetime)
         LOGGER.debug(f"Token expiration set to {self.token_expiration}.")
         self.country_code = await self._get_country_code()
         self.places = await self._get_places()
@@ -171,7 +182,7 @@ class CowayAuthClient(CowayHttpClient):
             LOGGER.debug(f"Login URL obtained: {login_url}")
         except AttributeError:
             raise CowayError(
-                "Coway API error: Coway servers did not return a valid Login URL. Retrying now."
+                "Coway API error: Coway servers did not return a valid Login URL."
             ) from None
         return login_url, cookies
 
@@ -217,8 +228,8 @@ class CowayAuthClient(CowayHttpClient):
             )
         return code
 
-    async def _get_token(self, auth_code: str) -> tuple[str, str]:
-        """Exchange auth code for access + refresh tokens."""
+    async def _get_token(self, auth_code: str) -> tuple[str, str, int]:
+        """Exchange auth code for access + refresh tokens and their lifetime."""
 
         data = {
             "authCode": auth_code,
@@ -242,10 +253,11 @@ class CowayAuthClient(CowayHttpClient):
                 f"Failed fetching Coway access token: {response['error'].get('message')}"
             )
 
-        access_token = response.get("data", {}).get("accessToken")
-        refresh_token = response.get("data", {}).get("refreshToken")
+        token_data = response.get("data", {})
+        access_token = token_data.get("accessToken")
+        refresh_token = token_data.get("refreshToken")
         if access_token and refresh_token:
-            return access_token, refresh_token
+            return access_token, refresh_token, _token_lifetime(token_data)
 
         raise CowayError(
             f"Failed fetching Coway access/refresh token for {self.username}. Response: {response}"
@@ -293,7 +305,7 @@ class CowayAuthClient(CowayHttpClient):
         url = f"{Endpoint.BASE_URI}{Endpoint.TOKEN_REFRESH}"
 
         LOGGER.debug(f"Refreshing tokens for {self.username} at {url}")
-        async with self._session.post(
+        async with self._ensure_session().post(
             url, headers=headers, data=json.dumps(data), timeout=self.timeout
         ) as resp:
             response = await self._response(resp)
@@ -312,7 +324,7 @@ class CowayAuthClient(CowayHttpClient):
         if self.access_token is None or self.refresh_token is None:
             raise CowayError(f"Failed to refresh tokens for {self.username}. Response: {response}")
 
-        self.token_expiration = datetime.now() + timedelta(seconds=3600)
+        self.token_expiration = datetime.now() + timedelta(seconds=_token_lifetime(token_data))
         LOGGER.debug(
             f"Tokens refreshed for {self.username}. New expiration: {self.token_expiration}"
         )
@@ -330,10 +342,12 @@ class CowayAuthClient(CowayHttpClient):
         response = await self._get_endpoint(endpoint=endpoint, headers=headers, params=None)
 
         if "data" in response:
-            LOGGER.debug(
-                f"Country code response for {self.username}: "
-                f"{json.dumps(response['data'], indent=4)}"
-            )
+            if LOGGER.isEnabledFor(logging.DEBUG):
+                LOGGER.debug(
+                    "Country code response for %s: %s",
+                    self.username,
+                    json.dumps(response["data"], indent=4),
+                )
             if "maintainInfos" in response["data"]:
                 raise ServerMaintenance("Coway Servers are undergoing maintenance.")
             member_info = response["data"].get("memberInfo", {})
