@@ -36,6 +36,15 @@ class TestSetLightMode:
         with pytest.raises(CowayError, match="light mode"):
             await client.async_set_light_mode(sample_device, LightMode.ON)
 
+    async def test_iot_style_success_code_accepted(self, sample_device):
+        client = _mock_control_client({"code": "S1000", "message": "OK", "data": {}})
+        await client.async_set_light_mode(sample_device, LightMode.OFF)
+
+    async def test_iot_style_error_code_raises(self, sample_device):
+        client = _mock_control_client({"code": "E4000", "message": "invalid attribute"})
+        with pytest.raises(CowayError, match="E4000"):
+            await client.async_set_light_mode(sample_device, LightMode.OFF)
+
 
 class TestSetLight:
     async def test_on_off_wire_values(self, sample_device):

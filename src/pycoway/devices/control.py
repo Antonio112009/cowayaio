@@ -22,7 +22,12 @@ class CowayControlClient(CowayDataClient):
     """Sends control commands to Coway purifiers."""
 
     def _validate_control_response(self, response: dict[str, Any] | str, command_name: str) -> None:
-        """Validate a control-command response."""
+        """Validate a control-command response.
+
+        Handles both response shapes seen in the wild: the legacy
+        ``{"header": {"error_code": ...}}`` and the current
+        ``{"code": "S1000", "message": "OK"}`` (S1000 = success).
+        """
 
         if isinstance(response, dict):
             header = response.get("header", {})
@@ -31,6 +36,12 @@ class CowayControlClient(CowayDataClient):
                     f"Failed to execute {command_name} command. "
                     f"Error code: {header['error_code']}, "
                     f"Error message: {header.get('error_text', 'unknown')}"
+                )
+            code = response.get("code")
+            if code is not None and code != "S1000":
+                raise CowayError(
+                    f"Failed to execute {command_name} command. "
+                    f"Code: {code}, Message: {response.get('message', 'unknown')}"
                 )
         else:
             raise CowayError(f"Failed to execute {command_name} command. Response: {response}")
