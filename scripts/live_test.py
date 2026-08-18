@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
 """Live smoke test against the real Coway IoCare API.
 
-Credentials are read from environment variables so they never end up in
-shell history, code, or logs:
+Credentials come from COWAY_EMAIL / COWAY_PASSWORD environment variables,
+or from a `.env` file in the repo root (already gitignored):
 
-    read -s COWAY_PASSWORD && export COWAY_PASSWORD
-    export COWAY_EMAIL="you@example.com"
+    # .env
+    COWAY_EMAIL=you@example.com
+    COWAY_PASSWORD=...
+
     .venv/bin/python scripts/live_test.py
 
-Or put them in an untracked env file (already gitignored) and source it:
-
-    # .coway_env
-    export COWAY_EMAIL="you@example.com"
-    export COWAY_PASSWORD="..."
-
-    source .coway_env && .venv/bin/python scripts/live_test.py
+The .env file is parsed literally by this script (no shell involved), so
+passwords with $, quotes, spaces, etc. are safe as-is — do NOT `source` it.
 
 Options:
     --debug     enable pycoway debug logging (verbose, includes payloads)
     --repeat    poll twice to show warm-cache timing
+    --env-file  path to the env file (default: <repo root>/.env)
 """
 
 import argparse
@@ -31,6 +29,27 @@ import time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from pycoway import CowayClient, CowayPurifier  # noqa: E402
+
+
+def _load_env_file(path: str) -> None:
+    """Load KEY=value pairs into os.environ, without shell expansion.
+
+    Real environment variables take precedence. Values may optionally be
+    wrapped in single or double quotes; everything else is literal.
+    """
+    if not os.path.isfile(path):
+        return
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip().removeprefix("export ").strip()
+            value = value.strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                value = value[1:-1]
+            os.environ.setdefault(key, value)
 
 
 def _mask(serial: str | None) -> str:
@@ -71,11 +90,12 @@ def _print_purifier(device_id: str, p: CowayPurifier) -> None:
         )
 
 
-async def run(debug: bool, repeat: bool) -> int:
+async def run(debug: bool, repeat: bool, env_file: str) -> int:
+    _load_env_file(env_file)
     email = os.environ.get("COWAY_EMAIL")
     password = os.environ.get("COWAY_PASSWORD")
     if not email or not password:
-        print("Set COWAY_EMAIL and COWAY_PASSWORD environment variables first.", file=sys.stderr)
+        print("Set COWAY_EMAIL and COWAY_PASSWORD (env vars or .env file).", file=sys.stderr)
         print("See the docstring at the top of this script for details.", file=sys.stderr)
         return 2
 
@@ -107,11 +127,17 @@ async def run(debug: bool, repeat: bool) -> int:
 
 
 def main() -> int:
+    repo_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--debug", action="store_true", help="enable pycoway debug logging")
     parser.add_argument("--repeat", action="store_true", help="poll twice to show cache effect")
+    parser.add_argument(
+        "--env-file",
+        default=os.path.join(repo_root, ".env"),
+        help="path to env file with COWAY_EMAIL/COWAY_PASSWORD",
+    )
     args = parser.parse_args()
-    return asyncio.run(run(debug=args.debug, repeat=args.repeat))
+    return asyncio.run(run(debug=args.debug, repeat=args.repeat, env_file=args.env_file))
 
 
 if __name__ == "__main__":
