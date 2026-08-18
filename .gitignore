@@ -13,6 +13,10 @@ dist/
 .venv/
 venv/
 
+# Local credentials for scripts/live_test.py — never commit
+.env
+.coway_env
+
 # IDE
 .idea/
 .vscode/
