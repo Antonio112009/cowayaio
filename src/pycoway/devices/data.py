@@ -1,14 +1,18 @@
 """Data-fetching layer for Coway IoCare purifiers."""
 
+import asyncio
 import json
 import logging
+from dataclasses import asdict
+from datetime import datetime
 from typing import Any
 
-from aiohttp import ClientError
+from aiohttp import ClientError, ClientSession
 
 from pycoway.account.maintenance import CowayMaintenanceClient
 from pycoway.constants import (
     CATEGORY_NAME,
+    TIMEOUT,
     Endpoint,
     Header,
     SensorCode,
@@ -30,9 +34,53 @@ from pycoway.exceptions import (
 
 LOGGER = logging.getLogger(__name__)
 
+IOT_DEVICES_CACHE_INTERVAL = 3600  # seconds — discovery fields rarely change
+
 
 class CowayDataClient(CowayMaintenanceClient):
     """Fetches purifier inventories, filter status, and timer data."""
+
+    def __init__(
+        self,
+        username: str,
+        password: str,
+        session: ClientSession | None = None,
+        timeout: int = TIMEOUT,
+        skip_password_change: bool = False,
+    ) -> None:
+        super().__init__(
+            username=username,
+            password=password,
+            session=session,
+            timeout=timeout,
+            skip_password_change=skip_password_change,
+        )
+        self._iot_devices_by_barcode: dict[str, dict[str, Any]] | None = None
+        self._iot_devices_cached_at: datetime | None = None
+
+    async def _fetch_place_devices(
+        self, place: dict[str, Any], headers: dict[str, str], params: dict[str, str]
+    ) -> list[dict[str, Any]]:
+        """Fetch the purifiers registered at a single place."""
+
+        url = f"{Endpoint.BASE_URI}{Endpoint.PLACES}/{place['placeId']}/devices"
+        LOGGER.debug(f"Fetching devices for {self.username}. URL: {url}")
+
+        response = await self._get_endpoint(url, headers, params)
+        if "error" in response:
+            raise CowayError(
+                f"Failed to get devices for Place ID: {place.get('placeId')} "
+                f"Response: {response['error']}"
+            )
+
+        devices = response.get("data", {}).get("content")
+        if not devices:
+            LOGGER.debug(
+                f"No devices at Place ID: {place.get('placeId')}, "
+                f"Place Name: {place.get('placeName')}"
+            )
+            return []
+        return [d for d in devices if d.get("categoryName") == CATEGORY_NAME]
 
     async def async_get_purifiers(self) -> list[dict[str, Any]]:
         """Get all purifiers linked to Coway account."""
@@ -43,8 +91,8 @@ class CowayDataClient(CowayMaintenanceClient):
 
         params = {"pageIndex": "0", "pageSize": "100"}
         headers = await self._create_endpoint_header()
-        purifiers: list[dict[str, Any]] = []
 
+        places = []
         for place in self.places:
             LOGGER.debug(
                 f"Checking place for {self.username}. "
@@ -52,35 +100,27 @@ class CowayDataClient(CowayMaintenanceClient):
                 f"Place Name: {place.get('placeName')}, "
                 f"Device Count: {place.get('deviceCnt')}"
             )
-            if not place.get("deviceCnt"):
-                continue
+            if place.get("deviceCnt"):
+                places.append(place)
 
-            url = f"{Endpoint.BASE_URI}{Endpoint.PLACES}/{place['placeId']}/devices"
-            LOGGER.debug(f"Fetching devices for {self.username}. URL: {url}")
+        results = await asyncio.gather(
+            *(self._fetch_place_devices(place, headers, params) for place in places),
+            return_exceptions=True,
+        )
+        if any(isinstance(r, AuthError) for r in results):
+            LOGGER.debug("Access and refresh tokens are invalid. Fetching new tokens.")
+            await self.login()
+            headers = await self._create_endpoint_header()
+            results = await asyncio.gather(
+                *(self._fetch_place_devices(place, headers, params) for place in places),
+                return_exceptions=True,
+            )
 
-            try:
-                response = await self._get_endpoint(url, headers, params)
-            except AuthError:
-                LOGGER.debug("Access and refresh tokens are invalid. Fetching new tokens.")
-                await self.login()
-                headers = await self._create_endpoint_header()
-                response = await self._get_endpoint(url, headers, params)
-
-            if "error" in response:
-                raise CowayError(
-                    f"Failed to get devices for Place ID: {place.get('placeId')} "
-                    f"Response: {response['error']}"
-                )
-
-            devices = response.get("data", {}).get("content")
-            if devices:
-                purifiers.extend(d for d in devices if d.get("categoryName") == CATEGORY_NAME)
-            else:
-                LOGGER.debug(
-                    f"No devices at Place ID: {place.get('placeId')}, "
-                    f"Place Name: {place.get('placeName')}"
-                )
-
+        purifiers: list[dict[str, Any]] = []
+        for result in results:
+            if isinstance(result, BaseException):
+                raise result
+            purifiers.extend(result)
         return purifiers
 
     async def async_get_purifiers_data(self) -> PurifierData:
@@ -92,22 +132,18 @@ class CowayDataClient(CowayMaintenanceClient):
         """
 
         LOGGER.debug(f"Getting purifiers data for {self.username}")
-        if not self.places:
-            LOGGER.debug(f"No places loaded. Doing initial login for {self.username}")
-            await self.login()
-
         purifiers = await self.async_get_purifiers()
-        LOGGER.debug(f"Purifiers found for {self.username}: {json.dumps(purifiers, indent=4)}")
+        if LOGGER.isEnabledFor(logging.DEBUG):
+            LOGGER.debug(
+                "Purifiers found for %s: %s", self.username, json.dumps(purifiers, indent=4)
+            )
         if not purifiers:
             raise NoPurifiers(
                 f"No purifiers found for any IoCare+ places associated with {self.username}."
             )
 
         # Fetch IoT device list for fields the legacy discovery doesn't return.
-        iot_devices = await self.async_get_iot_user_devices()
-        iot_by_barcode: dict[str, dict[str, Any]] = {
-            d["barcode"]: d for d in iot_devices if "barcode" in d
-        }
+        iot_by_barcode = await self._get_iot_devices_by_barcode()
         for dev in purifiers:
             serial = dev.get("deviceSerial") or dev.get("barcode", "")
             iot_dev = iot_by_barcode.get(serial, {})
@@ -134,59 +170,85 @@ class CowayDataClient(CowayMaintenanceClient):
         try:
             await self.async_server_maintenance_notice()
 
-            device_data: dict[str, CowayPurifier] = {}
-            for dev in purifiers:
-                nick = dev.get("dvcNick")
-                LOGGER.debug(f"Building CowayPurifier for {nick}")
-
-                # Build a lightweight DeviceAttributes for the IoT API calls.
-                attr = self._build_device_attr(dev)
-
-                # IoT JSON API: device status + timer, air quality + sensors.
-                LOGGER.debug(f"Fetching IoT control data for {nick}")
-                control_data = await self.async_get_iot_device_control(attr)
-
-                LOGGER.debug(f"Fetching IoT air home data for {nick}")
-                air_data = await self.async_get_iot_air_home(attr)
-
-                parsed_info = extract_iot_parsed_info(control_data, air_data, {})
-
-                # HTML scrape for MCU version + lux sensor (not in IoT API).
-                model_code = dev.get("modelCode") or dev.get("prodType", "")
-                place_id = str(dev.get("placeId", ""))
-                serial = dev.get("deviceSerial") or dev.get("barcode", "")
-                try:
-                    LOGGER.debug(f"Fetching HTML page for {nick}")
-                    html = await self._get_purifier_html(nick, serial, model_code, place_id)
-                    purifier_info = parse_purifier_html(html, nick)
-                    if purifier_info:
-                        supplements = extract_html_supplements(purifier_info)
-                        if supplements["mcu_version"]:
-                            parsed_info["mcu_info"] = {"currentMcuVer": supplements["mcu_version"]}
-                        if supplements["lux"] is not None:
-                            parsed_info["sensor_info"][SensorCode.LUX] = supplements["lux"]
-                except (ClientError, TimeoutError, CowayError):
-                    LOGGER.exception(f"HTML supplement fetch failed for {nick}, skipping MCU/lux")
-
-                # Rich filter data (dates, pollutants, descriptions) from legacy API.
-                LOGGER.debug(f"Fetching filter info for {nick}")
-                filter_info = await self.async_fetch_filter_status(place_id, serial, nick)
-                parsed_info["filter_info"] = build_filter_dict(filter_info)
-                LOGGER.debug(f"{nick} filter dict: {parsed_info['filter_info']}")
-
-                purifier = build_purifier(attr, parsed_info, raw_filters=filter_info)
-                device_data[purifier.device_attr.device_id] = purifier
-                LOGGER.debug(f"Finished CowayPurifier for {nick}")
+            # All per-device fetches are independent once the token check
+            # is disabled, so build every purifier concurrently.
+            results = await asyncio.gather(
+                *(self._build_purifier_from_device(dev) for dev in purifiers),
+                return_exceptions=True,
+            )
         finally:
             self.check_token = True
             LOGGER.debug("self.check_token set back to True")
 
+        device_data: dict[str, CowayPurifier] = {}
+        for result in results:
+            if isinstance(result, BaseException):
+                raise result
+            device_data[result.device_attr.device_id] = result
+
         all_purifiers = PurifierData(purifiers=device_data)
-        LOGGER.debug(
-            f"Final PurifierData for {self.username}: "
-            f"{json.dumps(all_purifiers, default=vars, indent=4)}"
-        )
+        if LOGGER.isEnabledFor(logging.DEBUG):
+            LOGGER.debug(
+                "Final PurifierData for %s: %s",
+                self.username,
+                json.dumps(asdict(all_purifiers), indent=4),
+            )
         return all_purifiers
+
+    async def _build_purifier_from_device(self, dev: dict[str, Any]) -> CowayPurifier:
+        """Fetch all data sources for one device concurrently and build it."""
+
+        nick = dev.get("dvcNick")
+        LOGGER.debug(f"Building CowayPurifier for {nick}")
+
+        # Build a lightweight DeviceAttributes for the IoT API calls.
+        attr = self._build_device_attr(dev)
+        model_code = dev.get("modelCode") or dev.get("prodType", "")
+        place_id = str(dev.get("placeId", ""))
+        serial = dev.get("deviceSerial") or dev.get("barcode", "")
+
+        # IoT JSON API (status + air quality), HTML scrape (MCU/lux), and
+        # legacy filter data are independent — fetch them in parallel.
+        control_data, air_data, supplements, filter_info = await asyncio.gather(
+            self.async_get_iot_device_control(attr),
+            self.async_get_iot_air_home(attr),
+            self._fetch_html_supplements(nick, serial, model_code, place_id),
+            self.async_fetch_filter_status(place_id, serial, nick),
+        )
+
+        parsed_info = extract_iot_parsed_info(control_data, air_data, {})
+        if supplements:
+            if supplements["mcu_version"]:
+                parsed_info["mcu_info"] = {"currentMcuVer": supplements["mcu_version"]}
+            if supplements["lux"] is not None:
+                parsed_info["sensor_info"][SensorCode.LUX] = supplements["lux"]
+
+        parsed_info["filter_info"] = build_filter_dict(filter_info)
+        LOGGER.debug(f"{nick} filter dict: {parsed_info['filter_info']}")
+
+        purifier = build_purifier(attr, parsed_info, raw_filters=filter_info)
+        LOGGER.debug(f"Finished CowayPurifier for {nick}")
+        return purifier
+
+    async def _fetch_html_supplements(
+        self, nick: str | None, serial: str, model_code: str, place_id: str
+    ) -> dict[str, Any] | None:
+        """Fetch MCU version + lux from the HTML page; None on failure.
+
+        These two data points are supplemental, so a failed scrape must
+        not fail the whole update.
+        """
+
+        try:
+            LOGGER.debug(f"Fetching HTML page for {nick}")
+            html = await self._get_purifier_html(nick, serial, model_code, place_id)
+            purifier_info = parse_purifier_html(html, nick)
+        except (ClientError, TimeoutError, CowayError):
+            LOGGER.exception(f"HTML supplement fetch failed for {nick}, skipping MCU/lux")
+            return None
+        if purifier_info is None:
+            return None
+        return extract_html_supplements(purifier_info)
 
     async def async_fetch_filter_status(
         self, place_id: str, serial: str, name: str
@@ -216,6 +278,31 @@ class CowayDataClient(CowayMaintenanceClient):
                 f"Failed to get filter status for purifier {name}: {response['error']}"
             )
         return response.get("data", {}).get("suppliesList", [])
+
+    async def _get_iot_devices_by_barcode(self) -> dict[str, dict[str, Any]]:
+        """Return the IoT device list keyed by barcode, cached for an hour.
+
+        The discovery fields it supplies (brand/type codes, order number)
+        are effectively static, so refetching them on every poll is waste.
+        An empty result is not cached, so transient failures retry on the
+        next poll.
+        """
+
+        now = datetime.now()
+        if (
+            self._iot_devices_by_barcode is not None
+            and self._iot_devices_cached_at is not None
+            and (now - self._iot_devices_cached_at).total_seconds() < IOT_DEVICES_CACHE_INTERVAL
+        ):
+            LOGGER.debug("IoT user-devices cache is fresh. Skipping fetch.")
+            return self._iot_devices_by_barcode
+
+        iot_devices = await self.async_get_iot_user_devices()
+        by_barcode = {d["barcode"]: d for d in iot_devices if "barcode" in d}
+        if by_barcode:
+            self._iot_devices_by_barcode = by_barcode
+            self._iot_devices_cached_at = now
+        return by_barcode
 
     async def async_get_iot_user_devices(self) -> list[dict[str, Any]]:
         """Fetch the IoT device list which contains ordNo, dvcBrandCd, etc."""

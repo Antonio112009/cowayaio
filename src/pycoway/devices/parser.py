@@ -14,6 +14,29 @@ from pycoway.exceptions import CowayError
 LOGGER = logging.getLogger(__name__)
 
 
+def _decode_embedded_json(raw: str) -> dict[str, Any]:
+    """Decode the JSON blob embedded in the purifier HTML page.
+
+    The page embeds the JSON inside a JS string, so it usually arrives
+    with escaped quotes. Try the least destructive interpretation first:
+    plain JSON, then JS-unescaped, and only as a last resort the legacy
+    strip-all-backslashes fallback (which corrupts ``\\n``/``\\uXXXX``
+    escapes inside string values).
+    """
+    candidates = (
+        raw,
+        raw.replace('\\"', '"').replace("\\\\", "\\"),
+        raw.replace("\\", ""),
+    )
+    last_exc: json.JSONDecodeError | None = None
+    for candidate in candidates:
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError as exc:
+            last_exc = exc
+    raise last_exc
+
+
 def parse_purifier_html(html: str, nick_name: str) -> dict[str, Any] | None:
     """Extract the purifier JSON data embedded in the HTML page.
 
@@ -27,9 +50,9 @@ def parse_purifier_html(html: str, nick_name: str) -> dict[str, Any] | None:
         script_text = script_search[0].text
         start_index = script_text.find("{")
         end_index = script_text.rfind("}")
-        extracted_string = script_text[start_index : end_index + 1].replace("\\", "")
-        purifier_json = json.loads(extracted_string)
-        LOGGER.debug(f"Parsed purifier JSON info: {json.dumps(purifier_json, indent=4)}")
+        purifier_json = _decode_embedded_json(script_text[start_index : end_index + 1])
+        if LOGGER.isEnabledFor(logging.DEBUG):
+            LOGGER.debug("Parsed purifier JSON info: %s", json.dumps(purifier_json, indent=4))
     except (IndexError, AttributeError, KeyError, json.JSONDecodeError, ValueError) as exc:
         raise CowayError(f"Failed to parse purifier HTML page for info: {exc}") from exc
 
@@ -191,7 +214,8 @@ def build_purifier(
         fan_speed=status.get("0003"),
         # "0007" semantics are model-dependent: basic models report 2 for
         # on; multi-mode models (250S/IconS) invert this — consumers with
-        # those models should read light_mode against LightMode instead.
+        # those models should compare light_mode against LightMode instead
+        # (LightMode is an IntEnum, so it compares equal to this int).
         light_on=status.get("0007") == 2,
         light_mode=status.get("0007"),
         button_lock=status.get("0024"),

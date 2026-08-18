@@ -298,3 +298,70 @@ class TestExtractIOTParsedInfo:
         }
         result = extract_iot_parsed_info({}, air, {})
         assert result["filter_info"]["odor-filter"] == {"filterRemain": 55}
+
+
+class TestIOTDevicesCache:
+    def _client(self, devices: list[dict]) -> CowayDataClient:
+        client = CowayDataClient("email@example.com", "password")
+        client.async_get_iot_user_devices = AsyncMock(return_value=devices)
+        return client
+
+    async def test_second_call_uses_cache(self):
+        client = self._client([{"barcode": "B1", "ordNo": "1"}])
+        first = await client._get_iot_devices_by_barcode()
+        second = await client._get_iot_devices_by_barcode()
+        assert first == {"B1": {"barcode": "B1", "ordNo": "1"}}
+        assert second == first
+        client.async_get_iot_user_devices.assert_awaited_once()
+
+    async def test_empty_result_is_not_cached(self):
+        client = self._client([])
+        assert await client._get_iot_devices_by_barcode() == {}
+        assert await client._get_iot_devices_by_barcode() == {}
+        assert client.async_get_iot_user_devices.await_count == 2
+
+
+class TestAsyncGetPurifiersData:
+    def _client(self) -> CowayDataClient:
+        client = CowayDataClient("email@example.com", "password")
+        client._check_token = AsyncMock()
+        client.places = [{"placeId": "p1", "deviceCnt": 1}]
+        client.async_get_purifiers = AsyncMock(
+            return_value=[
+                {"deviceSerial": "SER1", "dvcNick": "Bedroom", "placeId": "p1"},
+                {"deviceSerial": "SER2", "dvcNick": "Office", "placeId": "p1"},
+            ]
+        )
+        client.async_get_iot_user_devices = AsyncMock(return_value=[])
+        client.async_server_maintenance_notice = AsyncMock()
+        client.async_get_iot_device_control = AsyncMock(
+            return_value={"controlStatus": {"0001": "1", "0002": "1"}, "netStatus": True}
+        )
+        client.async_get_iot_air_home = AsyncMock(return_value={})
+        client._get_purifier_html = AsyncMock(side_effect=CowayError("no html"))
+        client.async_fetch_filter_status = AsyncMock(return_value=[])
+        return client
+
+    async def test_builds_all_devices_concurrently(self):
+        client = self._client()
+        data = await client.async_get_purifiers_data()
+
+        assert set(data.purifiers) == {"SER1", "SER2"}
+        assert data.purifiers["SER1"].is_on is True
+        assert data.purifiers["SER1"].auto_mode is True
+        assert data.purifiers["SER1"].network_status is True
+        # Token checking is re-enabled after the batch.
+        assert client.check_token is True
+
+    async def test_failed_device_restores_check_token(self):
+        client = self._client()
+        client.async_get_iot_device_control = AsyncMock(side_effect=CowayError("boom"))
+        with pytest.raises(CowayError, match="boom"):
+            await client.async_get_purifiers_data()
+        assert client.check_token is True
+
+    async def test_html_failure_does_not_fail_device(self):
+        client = self._client()
+        data = await client.async_get_purifiers_data()
+        assert data.purifiers["SER1"].mcu_version is None
+        assert data.purifiers["SER1"].lux_sensor is None

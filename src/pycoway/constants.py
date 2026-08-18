@@ -3,7 +3,7 @@
 import functools
 import logging
 import os
-from enum import StrEnum
+from enum import IntEnum, StrEnum
 
 from .__version__ import __version__ as version
 
@@ -107,23 +107,27 @@ class ErrorMessages(StrEnum):
     INVALID_GRANT = "통합회원 토큰 발급 오류 (error: invalid_grant)(error_desc: Code not valid)"
 
 
-class LightMode(StrEnum):
+class LightMode(IntEnum):
     """Light values for the ``0007`` control code on multi-mode models.
 
     The meaning of ``0007`` is model-dependent: basic on/off models use
     ``2`` for on and ``0`` for off (see ``async_set_light``), while
     multi-mode models (AIRMEGA 250S, IconS) use the values below.
+
+    IntEnum so members compare equal to the integer ``light_mode``
+    reported on :class:`~pycoway.devices.models.CowayPurifier`; the
+    control layer converts back to the string wire format when sending.
     """
 
-    AQI_OFF = "1"
-    OFF = "2"
-    HALF_OFF = "3"  # For IconS only
-    ON = "0"
+    AQI_OFF = 1
+    OFF = 2
+    HALF_OFF = 3  # For IconS only
+    ON = 0
 
 
 CATEGORY_NAME = "청정기"  # Translates to purifier
 PREFILTER_CYCLE = {2: "112", 3: "168", 4: "224"}
-TIMEOUT = 5 * 60
+TIMEOUT = 60
 
 
 class CommandCode(StrEnum):
